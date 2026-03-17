@@ -1226,7 +1226,7 @@ function renderOverview() {
 }
 
 // ══════════════════════════════════════
-// CHART — horizontal progress bars (SVG)
+// CHART — horizontal progress bars (HTML divs, no getBoundingClientRect needed)
 // ══════════════════════════════════════
 function renderChart() {
   const wrap = document.getElementById('mainChart');
@@ -1235,149 +1235,79 @@ function renderChart() {
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const textPrimary   = isDark ? '#f0efe9' : '#1a1a18';
   const textSecondary = isDark ? '#a0a09a' : '#6b6b67';
-  const bgTrack       = isDark ? '#2e2e2b' : '#ede';
 
-  const ROW_H   = 44;   // height per client row
-  const LABEL_W = 160;  // left label column
-  const RIGHT_W = 160;  // right info column
-  const PADDING = 16;
-
-  // Build display list respecting groups (same as table)
   const displayList = buildDisplayList(accountsData);
-  const chartItems = displayList
-    .filter(row => row.type !== 'group-header') // skip visual-only headers
+  const chartItems  = displayList
+    .filter(row => row.type !== 'group-header')
     .map(row => {
       const a = row.data;
       const s = a._groupSettings || settings[a.id] || {};
-      const obj = s.objective||0;
-      const rev = a.revenue||0;
+      const obj   = s.objective||0;
+      const rev   = totalRevenue(a);
       const spend = a.spend||0;
-      const roas = spend>0 ? (rev/spend) : 0;
-      const pct  = obj>0 ? Math.min(rev/obj, 1.05) : 0;
-      const sem  = semaphore(a);
-      const cur  = s.currency||'ARS';
-      const sym  = CURRENCY_SYMBOLS[cur]||'$';
+      const roas  = spend>0 ? rev/spend : 0;
+      const pct   = obj>0 ? Math.min(rev/obj, 1.05) : 0;
+      const sem   = semaphore(a);
+      const sym   = CURRENCY_SYMBOLS[s.currency||'ARS']||'$';
       const dname = a.isGroup ? a.name : displayName(a.id, a.name);
-      // For group-members, indent name
-      const label = row.type==='group-member' ? '  └ '+dname : dname;
-      return { name:label, obj, rev, spend, roas, pct, sem, sym, cur, id:a.id, isGroup:a.isGroup||false };
+      const label = row.type==='group-member' ? '└ '+dname : dname;
+      return { label, obj, rev, spend, roas, pct, sem, sym };
     });
-  const data = chartItems;
 
-  const HEADER_H = 24; // extra space for column headers
-  const svgH = Math.max(data.length * ROW_H + PADDING * 2 + HEADER_H, 60);
+  if (!chartItems.length) { wrap.innerHTML = ''; return; }
 
-  // Build SVG rows
-  let rows = '';
-  // Column header row (placeholder — fixed after width calc)
-  rows += `<g id="chartHeaders"></g>`;
-  data.forEach((d, i) => {
-    const y = PADDING + HEADER_H + i * ROW_H;
-    const cy = y + ROW_H / 2;
-    const barY = cy - 8;
-    const barH = 16;
+  const roasColor = r => r >= 3 ? '#1D9E75' : r >= 1.5 ? '#EF9F27' : '#E24B4A';
+  const fmtShort  = (sym, v) => {
+    if (v >= 1e9) return sym+(v/1e9).toFixed(1)+'B';
+    if (v >= 1e6) return sym+(v/1e6).toFixed(1)+'M';
+    if (v >= 1e3) return sym+(v/1e3).toFixed(0)+'K';
+    return sym+Math.round(v);
+  };
 
-    // truncate name
-    const name = d.name.length > 22 ? d.name.slice(0,20)+'…' : d.name;
+  const trackBg = isDark ? '#2e2e2b' : '#e8e8e8';
 
-    // fill width for the track (available = total - label - right - gaps)
-    // we compute dynamically via JS attr, but in SVG we use foreignObject for the bar
-    const barColor = d.sem.color;
+  wrap.innerHTML = `
+    <div style="display:grid;grid-template-columns:160px 1fr 56px;gap:0;font-family:-apple-system,sans-serif">
+      <!-- Headers -->
+      <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px 20px">Cliente</div>
+      <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px 4px">Progreso del objetivo</div>
+      <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px 4px">ROAS</div>
+      ${chartItems.map(d => {
+        const fillPct  = Math.min(d.pct, 1) * 100;
+        const rc       = roasColor(d.roas);
+        const revShort = fmtShort(d.sym, d.rev);
+        const showInside = d.obj > 0 && d.pct > 0.22;
+        const objPct   = d.obj > 0 ? Math.round(d.pct*100) : null;
 
-    // ROAS indicator color
-    const roasColor = d.roas >= 3 ? '#1D9E75' : d.roas >= 1.5 ? '#EF9F27' : '#E24B4A';
-
-    // Revenue formatted short
-    const revShort = d.rev >= 1e6 ? (d.rev/1e6).toFixed(1)+'M' :
-                     d.rev >= 1e3 ? (d.rev/1e3).toFixed(0)+'K' : Math.round(d.rev).toString();
-
-    rows += `
-      <!-- row ${i}: ${name} -->
-      <g class="chart-row">
-        <!-- semaphore dot + name -->
-        <circle cx="${PADDING + 6}" cy="${cy}" r="5" fill="${barColor}"/>
-        <text x="${PADDING + 16}" y="${cy + 4}" font-size="12" fill="${textPrimary}" font-family="-apple-system,sans-serif" font-weight="500">${name}</text>
-
-        <!-- track background -->
-        <rect x="${LABEL_W}" y="${barY}" width="TRACKW" height="${barH}" rx="4" fill="${isDark?'#2e2e2b':'#ebebeb'}"/>
-
-        <!-- progress fill -->
-        <rect x="${LABEL_W}" y="${barY}" width="FILLW_${i}" height="${barH}" rx="4" fill="${barColor}" opacity="0.85"/>
-
-        <!-- objective marker line at 100% -->
-        ${d.obj > 0 ? `<line x1="MARKERX" y1="${barY - 3}" x2="MARKERX" y2="${barY + barH + 3}" stroke="${isDark?'rgba(255,255,255,0.3)':'rgba(0,0,0,0.2)'}" stroke-width="1.5" stroke-dasharray="3,2"/>` : ''}
-
-        <!-- revenue label INSIDE bar (right-aligned to fill end) -->
-        ${d.obj > 0 && d.pct > 0.18 ? `<text x="REVTX_${i}" y="${cy + 4}" font-size="10" font-weight="700" fill="rgba(255,255,255,0.95)" font-family="-apple-system,sans-serif" text-anchor="end">${d.sym}${revShort}</text>` : ''}
-        <!-- revenue outside bar when too short -->
-        ${(d.obj === 0 || d.pct <= 0.18) ? `<text x="REVOUTX_${i}" y="${cy + 4}" font-size="10" font-weight="600" fill="${textSecondary}" font-family="-apple-system,sans-serif">${d.sym}${revShort}</text>` : ''}
-
-        <!-- % pct small label above bar left -->
-        ${d.obj > 0 ? `<text x="${LABEL_W + 4}" y="${barY - 2}" font-size="9" font-weight="700" fill="${barColor}" font-family="-apple-system,sans-serif">${Math.round(d.pct*100)}%</text>` : ''}
-
-        <!-- right side: ROAS chip only -->
-        <rect x="ROASX" y="${barY + 1}" width="48" height="14" rx="3" fill="${roasColor}22"/>
-        <text x="ROASTX" y="${barY + 11}" font-size="10" font-weight="700" fill="${roasColor}" font-family="-apple-system,sans-serif" text-anchor="middle">×${d.roas.toFixed(1)}</text>
-      </g>`;
-  });
-
-  // We'll inject a real SVG and then fix widths via JS after render
-  wrap.innerHTML = `<svg id="hbarSvg" width="100%" height="${svgH}" xmlns="http://www.w3.org/2000/svg">${rows}</svg>`;
-
-  // Now fix dynamic widths using JS
-  const svg = document.getElementById('hbarSvg');
-  // getBoundingClientRect can return 0 if not yet visible — use parentElement width or fallback
-  let totalW = svg.getBoundingClientRect().width;
-  if (!totalW || totalW < 100) {
-    totalW = (svg.parentElement && svg.parentElement.getBoundingClientRect().width) || 
-             (wrap.getBoundingClientRect().width) || 700;
-  }
-  const trackW = Math.max(totalW - LABEL_W - 64 - 8, 100);
-  const markerX = LABEL_W + trackW;
-  const rightX  = LABEL_W + trackW + 10;
-  const roasX   = LABEL_W + trackW + 76;
-  const roasTX  = roasX + 22;
-
-  let svgHTML = svg.innerHTML;
-  // Reduce RIGHT_W since we only show ROAS chip now (not revenue text)
-  const ROAS_W = 56;
-  const roasChipX  = LABEL_W + trackW + 8;
-  const roasChipTX = roasChipX + 24;
-
-  svgHTML = svgHTML.replace(/width="TRACKW"/g, `width="${Math.max(trackW,0)}"`);
-  data.forEach((d, i) => {
-    const fillW = Math.max(Math.min(d.pct, 1) * trackW, d.pct > 0 ? 4 : 0);
-    svgHTML = svgHTML.replace(`width="FILLW_${i}"`, `width="${fillW.toFixed(1)}"`);
-    // Revenue inside bar: 6px from right edge of fill
-    const revInsideX = LABEL_W + fillW - 4;
-    svgHTML = svgHTML.replace(`x="REVTX_${i}"`,    `x="${revInsideX.toFixed(1)}"`);
-    // Revenue outside bar: just after fill end + 4px
-    const revOutX = LABEL_W + Math.max(fillW, 4) + 6;
-    svgHTML = svgHTML.replace(`x="REVOUTX_${i}"`,  `x="${revOutX.toFixed(1)}"`);
-  });
-  svgHTML = svgHTML.replace(/x1="MARKERX"/g, `x1="${markerX.toFixed(1)}"`);
-  svgHTML = svgHTML.replace(/x2="MARKERX"/g, `x2="${markerX.toFixed(1)}"`);
-  svgHTML = svgHTML.replace(/x="ROASX"/g,    `x="${roasChipX.toFixed(1)}"`);
-  svgHTML = svgHTML.replace(/x="ROASTX"/g,   `x="${roasChipTX.toFixed(1)}"`);
-  svg.innerHTML = svgHTML;
-
-  // Inject column header labels now that we know positions
-  const headerEl = svg.querySelector('#chartHeaders');
-  if (headerEl) {
-    headerEl.innerHTML = `
-      <text x="${LABEL_W}" y="${PADDING + 14}" font-size="10" font-weight="700"
-            fill="${textSecondary}" font-family="-apple-system,sans-serif">PROGRESO DEL OBJETIVO</text>
-      <text x="${(roasChipX).toFixed(1)}" y="${PADDING + 14}" font-size="10" font-weight="700"
-            fill="${textSecondary}" font-family="-apple-system,sans-serif">ROAS</text>
-    `;
-  }
+        return `
+          <!-- name cell -->
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 4px 4px 0;min-width:0">
+            <span style="width:8px;height:8px;border-radius:50%;background:${d.sem.color};flex-shrink:0"></span>
+            <span style="font-size:12px;font-weight:500;color:${textPrimary};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.label}">${d.label.length>20?d.label.slice(0,19)+'…':d.label}</span>
+          </div>
+          <!-- bar cell -->
+          <div style="display:flex;align-items:center;gap:6px;padding:4px">
+            <div style="flex:1;height:16px;background:${trackBg};border-radius:4px;position:relative;overflow:hidden">
+              <div style="position:absolute;left:0;top:0;height:100%;width:${fillPct.toFixed(1)}%;background:${d.sem.color};opacity:.85;border-radius:4px;transition:width .3s"></div>
+              ${showInside ? `<span style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:rgba(255,255,255,.95)">${revShort}</span>` : ''}
+              ${d.obj > 0 ? `<div style="position:absolute;right:0;top:-2px;height:calc(100% + 4px);width:1.5px;background:rgba(0,0,0,.2);"></div>` : ''}
+            </div>
+            ${!showInside ? `<span style="font-size:10px;color:${textSecondary};white-space:nowrap;min-width:36px">${revShort}</span>` : '<span style="min-width:36px"></span>'}
+            ${objPct!==null ? `<span style="font-size:10px;font-weight:700;color:${d.sem.color};min-width:28px;text-align:right">${objPct}%</span>` : '<span style="min-width:28px"></span>'}
+          </div>
+          <!-- roas cell -->
+          <div style="display:flex;align-items:center;padding:4px 4px 4px 4px">
+            <span style="font-size:11px;font-weight:700;color:${rc};padding:2px 6px;background:${rc}22;border-radius:4px">×${d.roas.toFixed(1)}</span>
+          </div>`;
+      }).join('')}
+    </div>`;
 
   // Legend
-  document.getElementById('chartLegend').innerHTML = `
+  const legendEl = document.getElementById('chartLegend');
+  if (legendEl) legendEl.innerHTML = `
     <div class="legend-item"><span class="legend-dot" style="background:#1D9E75"></span>En objetivo</div>
     <div class="legend-item"><span class="legend-dot" style="background:#EF9F27"></span>En riesgo</div>
     <div class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>Fuera de objetivo</div>
-    <div style="font-size:11px;color:${textSecondary};margin-left:6px">· facturado dentro de la barra &nbsp;·&nbsp; línea = 100% del objetivo</div>
   `;
 }
 
@@ -1974,26 +1904,36 @@ function renderAccountsPage() {
 function toggleAllAccounts(val) {
   document.querySelectorAll('#accList input[type=checkbox]').forEach(cb => cb.checked=val);
 }
-function saveAccountVisibility() {
+async function saveAccountVisibility() {
+  // 1. Read checkboxes and save
   const newHidden = [];
   allAdAccounts.forEach(acc => {
-    const cb = document.getElementById('vis-'+acc.id);
+    const cb = document.getElementById('vis-' + acc.id);
     if (cb && !cb.checked) newHidden.push(acc.id);
   });
   hiddenAccs = newHidden;
   localStorage.setItem('cr_hidden', JSON.stringify(hiddenAccs));
+
+  // 2. Apply filter — adAccounts is now updated
   applyAccountVisibility();
-  // rebuild client filter
+
+  // 3. Rebuild client filter dropdown
   const sel = document.getElementById('clientFilter');
   sel.innerHTML = '<option value="">Todas las cuentas</option>';
   adAccounts.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.name}</option>`);
-  loadOverview().then(()=>{
+
+  // 4. Fetch fresh data for the visible accounts and re-render everything
+  try {
+    await loadOverview();
+    detailLoaded = false; // force detail to reload next time it's opened
     renderOverview();
-    if (detailLoaded) loadDetail();
-    // Show brief confirmation without blocking alert
-    const btn = document.querySelector('#page-accounts .btn-primary');
-    if (btn) { const orig = btn.textContent; btn.textContent = '✓ Guardado'; setTimeout(()=>btn.textContent=orig, 2000); }
-  });
+    // 5. Navigate to Vista general so the user sees the result
+    switchPage('overview');
+  } catch(e) {
+    console.error('[MetaDash] saveAccountVisibility error:', e);
+    renderOverview(); // render with whatever data we have
+    switchPage('overview');
+  }
 }
 function hideAccount(id, e) {
   if(e) e.stopPropagation();
