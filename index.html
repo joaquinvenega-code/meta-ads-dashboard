@@ -303,7 +303,7 @@ tr:hover .row-actions{opacity:1}
         </button>
         <button class="nav-item" onclick="openShareModal()" id="nav-share">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          Link de vista
+          Snapshot
         </button>
       </nav>
 
@@ -474,13 +474,7 @@ tr:hover .row-actions{opacity:1}
       <option value="messaging">Mensajería (WhatsApp / DM)</option>
       <option value="both">Ambos (web + mensajería)</option>
     </select>
-    <div id="mManualBlock" style="margin-top:14px;padding:12px;background:var(--amber-bg);border-radius:var(--radius);border:0.5px solid var(--amber);display:none">
-      <div style="font-size:12px;font-weight:600;color:var(--amber-tc);margin-bottom:6px">Ventas manuales del mes (mensajería)</div>
-      <div style="font-size:11px;color:var(--amber-tc);margin-bottom:8px;opacity:.8">Cargá las ventas informadas por el cliente. Se suman al revenue de Meta para calcular el progreso hacia el objetivo.</div>
-      <label style="font-size:12px;color:var(--amber-tc)">Revenue manual este mes</label>
-      <input id="mManualRevenue" type="number" placeholder="0" style="margin-top:4px">
-      <div id="mManualPreview" style="font-size:11px;color:var(--amber-tc);margin-top:6px"></div>
-    </div>
+
     <div class="modal-btns">
       <button class="btn" onclick="closeModalDirect()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveModal()">Guardar</button>
@@ -488,24 +482,40 @@ tr:hover .row-actions{opacity:1}
   </div>
 </div>
 
-<!-- ══ MODAL: SHARE ══ -->
+<!-- ══ MODAL: SHARE SNAPSHOT ══ -->
 <div class="modal-overlay" id="shareModalOverlay" onclick="closeShareModal(event)">
-  <div class="modal" onclick="event.stopPropagation()">
-    <h3>Link de visualización</h3>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Generá un link de solo lectura con un PIN. El tercero podrá ver los datos pero no modificar nada.</p>
-    <label>PIN de acceso (4-6 dígitos)</label>
-    <input id="sharePin" type="number" placeholder="Ej: 1234" class="inp" style="margin-bottom:4px">
-    <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Elegí un PIN que puedas comunicarle al tercero</p>
-    <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="generateShareLink()">Generar link</button>
-    <div id="shareLinkResult" style="display:none">
-      <div class="divider"></div>
-      <p style="font-size:12px;font-weight:600;margin:12px 0 4px">Link generado:</p>
-      <div class="share-link" id="shareLinkUrl"></div>
-      <p style="font-size:12px;font-weight:600;margin:8px 0 4px">PIN para el tercero:</p>
-      <div class="pin-display" id="sharePinDisplay"></div>
-      <button class="btn btn-primary" style="width:100%" onclick="copyShareLink()">Copiar link</button>
+  <div class="modal" onclick="event.stopPropagation()" style="width:440px">
+    <h3>Snapshot para terceros</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">
+      Generá una página HTML estática con los datos actuales. El tercero la abre en cualquier navegador — sin login, sin API, sin límites de hosting.
+    </p>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:0.5px solid var(--border2);border-radius:var(--radius);cursor:pointer" id="snapOptDownload">
+        <input type="radio" name="snapMode" value="download" checked onchange="updateSnapUI()" style="margin-top:2px;accent-color:var(--blue)">
+        <div>
+          <div style="font-size:13px;font-weight:600">Descargar archivo HTML</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Descargás un archivo <code style="font-size:11px">snapshot.html</code> y se lo mandás al tercero por email o WhatsApp. Lo abre directamente en su navegador.</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:0.5px solid var(--border2);border-radius:var(--radius);cursor:pointer" id="snapOptClipboard">
+        <input type="radio" name="snapMode" value="clipboard" onchange="updateSnapUI()" style="margin-top:2px;accent-color:var(--blue)">
+        <div>
+          <div style="font-size:13px;font-weight:600">Abrir en nueva pestaña</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Abre el snapshot directamente en una nueva pestaña. Podés ver cómo lo ve el tercero, o compartir el contenido desde ahí.</div>
+        </div>
+      </label>
     </div>
-    <div class="modal-btns">
+
+    <div style="padding:10px 14px;background:var(--blue-bg);border-radius:var(--radius);margin-bottom:16px;font-size:12px;color:var(--blue-tc)">
+      <strong>Incluye:</strong> Vista general + Detalle de cuentas con los datos del momento actual.
+      No incluye configuración, historial ni opciones de edición.
+    </div>
+
+    <button class="btn btn-primary" style="width:100%" onclick="generateSnapshot()">
+      Generar snapshot
+    </button>
+    <div class="modal-btns" style="margin-top:12px">
       <button class="btn" onclick="closeShareModal()">Cerrar</button>
     </div>
   </div>
@@ -1537,10 +1547,21 @@ function renderDetail() {
         <div class="dcard"><div class="dl">Mensajes</div><div class="dv">${fmtN(acc.messages)}</div></div>
         <div class="dcard"><div class="dl">Costo x msg</div><div class="dv">${acc.costPerMessage>0?sym+fmtDec(acc.costPerMessage,2):'—'}</div></div>`:''}
       </div>
-      ${manualRevenue[acc.id]>0 ? `
-      <div style="padding:8px 12px;background:var(--amber-bg);border-radius:var(--radius);margin-bottom:10px;font-size:12px;color:var(--amber-tc)">
-        <strong>Ventas manuales cargadas:</strong> ${sym}${fmtN(Math.round(manualRevenue[acc.id]))}
-        &nbsp;·&nbsp; Total mes: ${sym}${fmtN(Math.round(totalRevenue(acc)))}
+      ${!isReadonly && msg ? `
+      <div style="padding:12px;background:var(--amber-bg);border-radius:var(--radius);margin-bottom:10px;border:0.5px solid var(--amber)">
+        <div style="font-size:12px;font-weight:600;color:var(--amber-tc);margin-bottom:6px">Ventas manuales del mes (mensajería)</div>
+        <div style="font-size:11px;color:var(--amber-tc);margin-bottom:8px;opacity:.85">Ingresá las ventas informadas por el cliente. Se suman al revenue de Meta para calcular el progreso hacia el objetivo.</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input type="number" id="manrev-${acc.id}" value="${manualRevenue[acc.id]||''}"
+            placeholder="0"
+            style="width:160px;padding:7px 10px;border:0.5px solid var(--amber);border-radius:var(--radius);font-size:13px;background:var(--bg);color:var(--text)"
+            oninput="previewManualRev('${acc.id}')">
+          <button class="btn btn-sm" style="background:var(--amber);color:#fff;border-color:var(--amber)"
+            onclick="saveManualRev('${acc.id}',event)">Guardar ventas</button>
+          <span id="manrev-preview-${acc.id}" style="font-size:12px;color:var(--amber-tc)">
+            ${manualRevenue[acc.id]>0 ? sym+fmtN(Math.round(manualRevenue[acc.id]))+' cargado · Total: '+sym+fmtN(Math.round(totalRevenue(acc))) : ''}
+          </span>
+        </div>
       </div>` : ''}
       ${!isReadonly?`
       <div>
@@ -1983,33 +2004,12 @@ function openModal(id, name, e) {
   document.getElementById('mBudget').value    = s.budget||'';
   document.getElementById('mCurrency').value  = s.currency||'ARS';
   document.getElementById('mTracking').value  = s.tracking||'ecommerce';
-  const manRev = manualRevenue[id]||0;
-  document.getElementById('mManualRevenue').value = manRev||'';
-  updateManualRevenueUI(id);
-  document.getElementById('mTracking').onchange = () => updateManualRevenueUI(id);
+  // tracking change no longer needs to show manual block in modal
   document.getElementById('modalOverlay').classList.add('open');
 }
 function closeModal(e) { if(e.target.id==='modalOverlay') closeModalDirect(); }
 function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('open'); }
-function updateManualRevenueUI(id) {
-  const trk = document.getElementById('mTracking').value;
-  const block = document.getElementById('mManualBlock');
-  const showManual = trk === 'messaging' || trk === 'both';
-  block.style.display = showManual ? 'block' : 'none';
-  if (showManual) {
-    const s = settings[id]||{};
-    const sym = CURRENCY_SYMBOLS[s.currency||'ARS']||'$';
-    const manRev = parseFloat(document.getElementById('mManualRevenue').value)||0;
-    const acc = accountsData.find(a=>a.id===id);
-    const metaRev = acc ? (acc.revenue||0) : 0;
-    const total = metaRev + manRev;
-    const obj = parseFloat(document.getElementById('mObjective').value)||0;
-    document.getElementById('mManualPreview').innerHTML = obj>0
-      ? `Meta: ${sym}${fmtN(Math.round(metaRev))} + Manual: ${sym}${fmtN(Math.round(manRev))} = <strong>${sym}${fmtN(Math.round(total))}</strong> (${Math.round(total/obj*100)}% del objetivo)`
-      : `Meta: ${sym}${fmtN(Math.round(metaRev))} + Manual: ${sym}${fmtN(Math.round(manRev))} = ${sym}${fmtN(Math.round(total))}`;
-    document.getElementById('mManualRevenue').oninput = () => updateManualRevenueUI(id);
-  }
-}
+
 function saveModal() {
   if(!editingId) return;
   settings[editingId] = {
@@ -2019,11 +2019,6 @@ function saveModal() {
     tracking:  document.getElementById('mTracking').value,
   };
   localStorage.setItem('cr_settings', JSON.stringify(settings));
-  // Save manual revenue
-  const manRev = parseFloat(document.getElementById('mManualRevenue').value)||0;
-  if (manRev > 0) manualRevenue[editingId] = manRev;
-  else delete manualRevenue[editingId];
-  saveManualRevenue();
   // Archive current month snapshot
   const acc = accountsData.find(a=>a.id===editingId);
   if (acc) archiveMonthResult(editingId, acc.revenue||0, acc.spend||0);
@@ -2039,30 +2034,219 @@ function saveObs(id, e) {
   const btn = document.getElementById('savebtn-'+id);
   if(btn){ btn.textContent='✓ Guardado'; setTimeout(()=>btn.textContent='Guardar observación',2000); }
 }
+function previewManualRev(id) {
+  const inp = document.getElementById('manrev-'+id);
+  const prev = document.getElementById('manrev-preview-'+id);
+  if (!inp || !prev) return;
+  const val = parseFloat(inp.value)||0;
+  const s = settings[id]||{};
+  const sym = CURRENCY_SYMBOLS[s.currency||'ARS']||'$';
+  const acc = accountsData.find(a=>a.id===id);
+  const metaRev = acc ? (acc.revenue||0) : 0;
+  const total = metaRev + val;
+  const obj = s.objective||0;
+  if (val > 0) {
+    prev.textContent = sym+fmtN(Math.round(val))+' · Total: '+sym+fmtN(Math.round(total))
+      + (obj>0 ? ' ('+Math.round(total/obj*100)+'% del objetivo)' : '');
+  } else {
+    prev.textContent = '';
+  }
+}
+function saveManualRev(id, e) {
+  if(e) e.stopPropagation();
+  const inp = document.getElementById('manrev-'+id);
+  if (!inp) return;
+  const val = parseFloat(inp.value)||0;
+  if (val > 0) manualRevenue[id] = val;
+  else delete manualRevenue[id];
+  saveManualRevenue();
+  // Archive snapshot with new data
+  const acc = accountsData.find(a=>a.id===id);
+  if (acc) archiveMonthResult(id, acc.revenue||0, acc.spend||0);
+  // Update preview
+  previewManualRev(id);
+  // Refresh charts and tables
+  renderOverview();
+  renderChart();
+  const btn = e ? e.target : null;
+  if (btn) { btn.textContent='✓ Guardado'; setTimeout(()=>btn.textContent='Guardar ventas',2000); }
+}
 
 // ══════════════════════════════════════
 // SHARE MODAL
 // ══════════════════════════════════════
 function openShareModal() {
-  document.getElementById('shareLinkResult').style.display='none';
-  document.getElementById('sharePin').value='';
   document.getElementById('shareModalOverlay').classList.add('open');
+  updateSnapUI();
 }
 function closeShareModal(e) {
   if(!e || e.target.id==='shareModalOverlay') document.getElementById('shareModalOverlay').classList.remove('open');
 }
-function generateShareLink() {
-  const pin = document.getElementById('sharePin').value.trim();
-  if(!pin||pin.length<4){ alert('El PIN debe tener al menos 4 dígitos'); return; }
-  localStorage.setItem('cr_sharepin', pin);
-  const url = location.origin + location.pathname + '?view=1';
-  document.getElementById('shareLinkUrl').textContent = url;
-  document.getElementById('sharePinDisplay').textContent = pin;
-  document.getElementById('shareLinkResult').style.display='block';
+function updateSnapUI() {
+  const mode = document.querySelector('input[name="snapMode"]:checked').value;
+  document.getElementById('snapOptDownload').style.borderColor  = mode==='download'  ? 'var(--blue)' : 'var(--border2)';
+  document.getElementById('snapOptClipboard').style.borderColor = mode==='clipboard' ? 'var(--blue)' : 'var(--border2)';
 }
-function copyShareLink() {
-  const url = document.getElementById('shareLinkUrl').textContent;
-  navigator.clipboard.writeText(url).then(()=>alert('Link copiado al portapapeles')).catch(()=>alert('Link: '+url));
+
+function generateSnapshot() {
+  if (!accountsData.length) { alert('No hay datos cargados. Sincronizá primero.'); return; }
+  const mode = document.querySelector('input[name="snapMode"]:checked').value;
+  const html = buildSnapshotHTML();
+  if (mode === 'download') {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'snapshot-meta-ads-' + new Date().toISOString().slice(0,10) + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    closeShareModal();
+  } else {
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    closeShareModal();
+  }
+}
+
+function buildSnapshotHTML() {
+  const dateLabel = document.getElementById('dateRange0')
+    ? document.getElementById('dateRange0').options[document.getElementById('dateRange0').selectedIndex].text
+    : 'Este mes';
+  const genDate = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  // Build overview rows
+  const displayList = buildDisplayList(accountsData);
+  const ovRows = displayList.map(row => {
+    if (row.type === 'group-header') {
+      return `<tr><td colspan="8" style="padding:8px 12px;font-size:11px;font-weight:700;color:#185FA5;background:#E6F1FB;border-top:2px solid #185FA5;text-transform:uppercase;letter-spacing:.05em">${row.group.name}</td></tr>`;
+    }
+    const acc = row.data;
+    const s   = acc._groupSettings || settings[acc.id] || {};
+    const obj = s.objective||0;
+    const bud = s.budget||0;
+    const sym = CURRENCY_SYMBOLS[s.currency||'ARS']||'$';
+    const rev = totalRevenue(acc);
+    const roas = acc.spend>0 ? (rev/acc.spend).toFixed(2) : '—';
+    const objPct = obj>0 ? Math.round(rev/obj*100) : null;
+    const budPct = bud>0 ? Math.round(acc.spend/bud*100) : null;
+    const sem = semaphore(acc);
+    const indent = row.type==='group-member';
+    const name = (indent?'└ ':'') + (acc.isGroup ? acc.name : displayName(acc.id,acc.name));
+    const barW = objPct!==null ? Math.min(objPct,100) : 0;
+    const progCell = objPct!==null
+      ? `<div style="display:flex;align-items:center;gap:6px;min-width:120px"><div style="flex:1;height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden"><div style="width:${barW}%;height:100%;background:${sem.color};border-radius:3px"></div></div><span style="font-size:11px;font-weight:700;color:${sem.color}">${objPct}%</span></div>`
+      : '—';
+    const statusDot = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${sem.bg};color:${sem.tc}"><span style="width:7px;height:7px;border-radius:50%;background:${sem.color};display:inline-block"></span>${sem.label}</span>`;
+    return `<tr style="border-bottom:0.5px solid #e8e8e8">
+      <td style="padding:9px 12px;font-weight:600;font-size:13px">${name}</td>
+      <td style="padding:9px 12px;font-size:13px">${obj ? sym+fmtN(Math.round(obj)) : '<span style="color:#aaa">—</span>'}</td>
+      <td style="padding:9px 12px">${progCell}</td>
+      <td style="padding:9px 12px;font-size:13px">${sym}${fmtN(Math.round(rev))}</td>
+      <td style="padding:9px 12px;font-size:13px">${sym}${fmtN(Math.round(acc.spend||0))}</td>
+      <td style="padding:9px 12px;font-size:13px;font-weight:700">×${roas}</td>
+      <td style="padding:9px 12px;font-size:13px;${budPct!==null&&budPct>100?'color:#E24B4A;font-weight:700':''}">${budPct!==null?budPct+'%':'—'}</td>
+      <td style="padding:9px 12px">${statusDot}</td>
+    </tr>`;
+  }).join('');
+
+  // Build detail rows (all accounts, expanded metrics)
+  const detailRows = accountsData.map((acc,i) => {
+    const s   = settings[acc.id]||{};
+    const sym = CURRENCY_SYMBOLS[s.currency||'ARS']||'$';
+    const rev = totalRevenue(acc);
+    const roas = acc.spend>0 ? (rev/acc.spend).toFixed(2) : '—';
+    const sem = semaphore(acc);
+    const obj = s.objective||0;
+    const objPct = obj>0 ? Math.round(rev/obj*100) : null;
+    const trk = s.tracking||'ecommerce';
+    const ecom = trk==='ecommerce'||trk==='both';
+    const msg  = trk==='messaging'||trk==='both';
+    const obs  = observations[acc.id]||'';
+    const bg   = i%2===0 ? '#fff' : '#f9f9f7';
+    return `<tr style="background:${bg}">
+      <td style="padding:10px 12px;font-weight:600;font-size:13px">${displayName(acc.id,acc.name)}</td>
+      <td style="padding:10px 12px;font-size:13px">${sym}${fmtN(Math.round(rev))}</td>
+      <td style="padding:10px 12px;font-size:13px">${sym}${fmtN(Math.round(acc.spend||0))}</td>
+      <td style="padding:10px 12px;font-size:13px;font-weight:700">×${roas}</td>
+      <td style="padding:10px 12px;font-size:13px">${objPct!==null?objPct+'%':'—'}</td>
+      <td style="padding:10px 12px;font-size:13px">${fmtDec(acc.ctr,2)}%</td>
+      ${ecom?`<td style="padding:10px 12px;font-size:13px">${fmtN(acc.purchases)}</td><td style="padding:10px 12px;font-size:13px">${acc.costPerPurchase>0?sym+fmtDec(acc.costPerPurchase,2):'—'}</td>`:'<td colspan="2" style="padding:10px 12px;color:#aaa;font-size:12px">— e-commerce</td>'}
+      ${msg?`<td style="padding:10px 12px;font-size:13px">${fmtN(acc.messages)}</td><td style="padding:10px 12px;font-size:13px">${acc.costPerMessage>0?sym+fmtDec(acc.costPerMessage,2):'—'}</td>`:'<td colspan="2" style="padding:10px 12px;color:#aaa;font-size:12px">— mensajería</td>'}
+      <td style="padding:10px 12px;font-size:12px;color:#555;max-width:200px">${obs||'<span style="color:#ccc">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  const thStyle = 'text-align:left;padding:8px 12px;font-size:10px;font-weight:700;color:#6b6b67;text-transform:uppercase;letter-spacing:.04em;background:#f5f5f3;border-bottom:1.5px solid #ddd;white-space:nowrap';
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meta Ads — Snapshot ${new Date().toISOString().slice(0,10)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a18;padding:24px}
+  .card{background:#fff;border:0.5px solid #e0e0dc;border-radius:12px;padding:20px 24px;margin-bottom:20px}
+  h1{font-size:20px;font-weight:700;margin-bottom:4px}
+  h2{font-size:15px;font-weight:700;margin-bottom:14px;color:#1a1a18}
+  .meta{font-size:12px;color:#888;margin-bottom:20px}
+  table{width:100%;border-collapse:collapse}
+  @media print{body{padding:0;background:#fff}.card{border:none;border-radius:0;padding:0 0 20px}}
+  @page{margin:15mm 12mm;size:A4 landscape}
+</style>
+</head>
+<body>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+  <div>
+    <h1>Meta Ads Dashboard</h1>
+    <div class="meta">Período: ${dateLabel} &nbsp;·&nbsp; Generado: ${genDate} &nbsp;·&nbsp; ${accountsData.length} cuentas</div>
+  </div>
+  <button onclick="window.print()" style="padding:8px 16px;background:#1877F2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">⎙ Imprimir / PDF</button>
+</div>
+
+<div class="card">
+  <h2>Vista general</h2>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th style="${thStyle}">Cuenta</th>
+        <th style="${thStyle}">Objetivo</th>
+        <th style="${thStyle}">Progreso</th>
+        <th style="${thStyle}">Facturado</th>
+        <th style="${thStyle}">Invertido</th>
+        <th style="${thStyle}">ROAS</th>
+        <th style="${thStyle}">% Presup.</th>
+        <th style="${thStyle}">Estado</th>
+      </tr></thead>
+      <tbody>${ovRows}</tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Detalle de cuentas</h2>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th style="${thStyle}">Cuenta</th>
+        <th style="${thStyle}">Facturado</th>
+        <th style="${thStyle}">Invertido</th>
+        <th style="${thStyle}">ROAS</th>
+        <th style="${thStyle}">% Objetivo</th>
+        <th style="${thStyle}">CTR</th>
+        <th style="${thStyle}">Compras</th>
+        <th style="${thStyle}">Costo/compra</th>
+        <th style="${thStyle}">Mensajes</th>
+        <th style="${thStyle}">Costo/msg</th>
+        <th style="${thStyle}">Observaciones</th>
+      </tr></thead>
+      <tbody>${detailRows}</tbody>
+    </table>
+  </div>
+</div>
+</body></html>`;
 }
 
 // ══════════════════════════════════════
