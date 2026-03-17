@@ -1,0 +1,2254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control ROAS — Meta Ads Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg2:#f7f7f5;--bg3:#f0efe9;
+  --text:#1a1a18;--text2:#6b6b67;--text3:#9b9b96;
+  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.16);
+  --radius:8px;--radius-lg:12px;
+  --blue:#1877F2;--blue-bg:#e8f0fd;--blue-tc:#0d47a1;
+  --green:#1D9E75;--green-bg:#E1F5EE;--green-tc:#085041;
+  --amber:#EF9F27;--amber-bg:#FAEEDA;--amber-tc:#633806;
+  --red:#E24B4A;--red-bg:#FCEBEB;--red-tc:#791F1F;
+  --gray:#888780;--gray-bg:#F1EFE8;--gray-tc:#2C2C2A;
+  --sidebar:220px;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2b;
+  --text:#f0efe9;--text2:#a0a09a;--text3:#6b6b67;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.16);
+  --blue-bg:#1a2a4a;--blue-tc:#90b8f8;
+  --green-bg:#0d2b22;--green-tc:#9FE1CB;
+  --amber-bg:#2b1f08;--amber-tc:#FAC775;
+  --red-bg:#2b0f0f;--red-tc:#F7C1C1;
+  --gray-bg:#2a2a27;--gray-tc:#D3D1C7;
+}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+
+/* ── BUTTONS ── */
+.btn{padding:7px 14px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;cursor:pointer;transition:background .12s;white-space:nowrap}
+.btn:hover{background:var(--bg2)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-xs{padding:3px 8px;font-size:11px}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-primary:hover{opacity:.88}
+.btn-danger{color:var(--red);border-color:var(--red)}
+.btn-danger:hover{background:var(--red-bg)}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-ghost:hover{background:var(--bg2)}
+.btn-fb{display:flex;align-items:center;gap:10px;padding:12px 20px;background:#1877F2;color:#fff;border:none;border-radius:var(--radius);font-size:15px;font-weight:600;cursor:pointer;width:100%;justify-content:center}
+.btn-fb:hover{opacity:.88}
+.btn-fb svg{width:20px;height:20px;fill:#fff;flex-shrink:0}
+
+/* ── INPUTS ── */
+.inp{width:100%;padding:8px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;background:var(--bg);color:var(--text)}
+.inp:focus{outline:2px solid var(--blue);outline-offset:-1px}
+select.inp,select{padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;background:var(--bg);color:var(--text)}
+
+/* ── CONFIG / LOGIN SCREEN ── */
+#configScreen{max-width:500px;margin:40px auto;padding:0 16px}
+.config-hero{text-align:center;margin-bottom:28px}
+.config-hero h1{font-size:24px;font-weight:700;margin-bottom:6px}
+.config-hero p{font-size:14px;color:var(--text2)}
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:16px}
+.card h3{font-size:14px;font-weight:600;margin-bottom:12px}
+.step{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--blue-bg);color:var(--blue);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step p{font-size:13px;color:var(--text2);line-height:1.5}
+.step code{font-family:monospace;font-size:12px;background:var(--bg2);padding:1px 5px;border-radius:4px;color:var(--text)}
+.alert{padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:12px;display:none}
+.alert-err{background:var(--red-bg);color:var(--red-tc);border:0.5px solid var(--red)}
+.alert-ok{background:var(--green-bg);color:var(--green-tc);border:0.5px solid var(--green)}
+
+/* ── PIN SCREEN ── */
+#pinScreen{max-width:360px;margin:80px auto;padding:0 16px;text-align:center;display:none}
+#pinScreen h2{font-size:20px;font-weight:700;margin-bottom:8px}
+#pinScreen p{font-size:13px;color:var(--text2);margin-bottom:24px}
+.pin-input{width:160px;text-align:center;font-size:24px;font-weight:700;letter-spacing:8px;padding:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:12px}
+
+/* ── APP SHELL ── */
+#app{display:none;min-height:100vh}
+.app-layout{display:flex;min-height:100vh}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar);background:var(--bg);border-right:0.5px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar-logo{padding:20px 16px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px}
+.sidebar-logo .logo-icon{width:30px;height:30px;background:var(--blue);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sidebar-logo .logo-icon svg{width:17px;height:17px;fill:#fff}
+.sidebar-logo .logo-text{font-size:14px;font-weight:700;line-height:1.2}
+.sidebar-logo .logo-sub{font-size:10px;color:var(--text3)}
+.sidebar-nav{flex:1;padding:12px 8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);transition:background .1s,color .1s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--bg2);color:var(--text)}
+.nav-item.active{background:var(--blue-bg);color:var(--blue)}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:.7}
+.nav-item.active svg{opacity:1}
+.nav-section-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:8px 12px 4px;margin-top:8px}
+.sidebar-bottom{padding:12px 8px;border-top:0.5px solid var(--border)}
+.user-info{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius);background:var(--bg2);margin-bottom:8px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;overflow:hidden;flex-shrink:0}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.user-name{font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sync-info{font-size:10px;color:var(--text3);padding:0 10px 6px;text-align:center}
+
+/* ── MAIN CONTENT ── */
+.main{flex:1;min-width:0;padding:24px}
+.page{display:none}
+.page.active{display:block}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.page-title{font-size:18px;font-weight:700}
+
+/* ── CONTROLS ── */
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.date-range-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+
+/* ── STAT GRID ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px}
+.stat-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.stat-value{font-size:22px;font-weight:700}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:2px}
+@media(max-width:800px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ── CHART ── */
+.chart-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.chart-title{font-size:13px;font-weight:600}
+.chart-legend{display:flex;gap:14px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.chart-wrap{position:relative;min-height:60px}
+
+/* ── TABLE ── */
+.tbl-wrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.tbl-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:var(--bg2)}
+th{text-align:left;padding:10px 12px;font-weight:600;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border);white-space:nowrap;user-select:none}
+th.dragging{opacity:.4}
+th.drag-over{border-left:2px solid var(--blue)}
+th.sortable{cursor:pointer}
+th[draggable]{cursor:grab}
+th[draggable]:active{cursor:grabbing}
+th.sortable:hover{color:var(--text)}
+td{padding:10px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.clickable:hover td{background:var(--bg2);cursor:pointer}
+tr.row-hidden{display:none}
+
+/* ── PROGRESS ── */
+.prog{display:flex;align-items:center;gap:7px;min-width:120px}
+.prog-bar{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px}
+.prog-pct{font-size:11px;font-weight:700;min-width:34px;text-align:right}
+
+/* ── BADGE ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tag{display:inline-flex;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+
+/* ── DETAIL ROW ── */
+.detail-row{display:none;background:var(--bg2)}
+.detail-panel{padding:16px 20px}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin-bottom:14px}
+.dcard{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:11px 14px}
+.dl{font-size:11px;color:var(--text2);margin-bottom:2px}
+.dv{font-size:16px;font-weight:700}
+textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--radius);padding:8px 12px;font-size:13px;font-family:inherit;resize:vertical;min-height:60px;background:var(--bg);color:var(--text)}
+
+/* ── COL TOGGLES ── */
+.col-cfg{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);margin-bottom:14px;align-items:center}
+.col-cfg-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+label.ctog{display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:4px 10px;border:0.5px solid var(--border);border-radius:20px;background:var(--bg2);color:var(--text2);transition:background .1s}
+label.ctog:has(input:checked){background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
+label.ctog input{display:none}
+
+/* ── ACCOUNT MANAGER ── */
+.acc-manager{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px}
+.acc-manager-title{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.acc-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto}
+.acc-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg2)}
+.acc-item label{flex:1;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.acc-item input[type=checkbox]{accent-color:var(--blue);width:15px;height:15px}
+.acc-currency-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:var(--blue-bg);color:var(--blue-tc)}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(2px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:24px;width:400px;max-width:94vw;animation:slideUp .18s ease;max-height:90vh;overflow-y:auto}
+@keyframes slideUp{from{opacity:0;transform:translateY(12px)}}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:16px}
+.modal label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;margin-top:12px;font-weight:600}
+.modal input,.modal select{width:100%;padding:8px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;background:var(--bg);color:var(--text)}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+/* ── LOADING ── */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:14px}
+.spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .65s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{font-size:13px;color:var(--text2)}
+
+/* ── READONLY BANNER ── */
+.readonly-banner{background:var(--amber-bg);color:var(--amber-tc);border-bottom:0.5px solid var(--amber);padding:8px 20px;font-size:12px;font-weight:600;text-align:center;letter-spacing:.02em}
+
+/* ── SHARE MODAL SPECIAL ── */
+.pin-display{font-size:32px;font-weight:800;letter-spacing:10px;color:var(--blue);text-align:center;padding:16px;background:var(--blue-bg);border-radius:var(--radius);margin:12px 0}
+.share-link{font-size:12px;font-family:monospace;background:var(--bg2);padding:10px;border-radius:var(--radius);word-break:break-all;margin:8px 0;color:var(--text2)}
+
+/* ── MISC ── */
+.empty{text-align:center;padding:48px 20px;color:var(--text2)}
+.empty p{font-size:13px;margin-top:8px}
+.row-actions{display:flex;gap:4px;opacity:0;transition:opacity .1s}
+tr:hover .row-actions{opacity:1}
+.divider{height:0.5px;background:var(--border);margin:8px 0}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="configScreen">
+  <!-- Loading overlay — shown during auto-login, hides the form without destroying it -->
+  <div id="loginLoadingOverlay" style="display:none;position:fixed;inset:0;background:var(--bg3);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+    <div class="spinner"></div>
+    <p id="loginLoadingMsg" style="font-size:14px;color:var(--text2)">Reconectando con Meta...</p>
+    <button class="btn btn-sm" onclick="cancelAutoLogin()" style="margin-top:8px;font-size:12px;color:var(--text3)">Cancelar y volver al login</button>
+  </div>
+  <div class="config-hero">
+    <div style="width:56px;height:56px;background:var(--blue);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+    </div>
+    <h1>Control ROAS</h1>
+    <p>Dashboard de Meta Ads para tu agencia</p>
+  </div>
+  <div class="card">
+    <h3>Conectar con Meta</h3>
+    <input class="inp" id="appIdInput" placeholder="App ID de Meta (ej: 1234567890123456)" style="margin-bottom:12px">
+    <p id="savedAppIdNote" style="font-size:11px;color:var(--green);margin-bottom:8px;display:none">✓ App ID guardado — intentando reconectar...</p>
+    <div id="alertMsg" class="alert alert-err"></div>
+    <button class="btn-fb" onclick="initFBLogin()">
+      <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      Continuar con Facebook
+    </button>
+    <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">Autenticación oficial — nunca almacenamos tu token</p>
+    <div id="alertMsg" class="alert alert-err" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <h3>Pasos para obtener tu App ID</h3>
+    <div class="step"><div class="step-num">1</div><p>Ir a <strong>developers.facebook.com</strong> → Mis apps → Crear app → tipo <strong>Negocios</strong></p></div>
+    <div class="step"><div class="step-num">2</div><p>Agregar producto <strong>Marketing API</strong></p></div>
+    <div class="step"><div class="step-num">3</div><p>Copiar el <strong>App ID</strong> desde Configuración básica</p></div>
+    <div class="step"><div class="step-num">4</div><p>Agregar plataforma → Sitio web → URL: <code>https://control-roas.netlify.app</code></p></div>
+    <div class="step"><div class="step-num">5</div><p>Facebook Login → Configuración → Valid OAuth Redirect URIs → misma URL</p></div>
+  </div>
+</div>
+
+<!-- ══ PIN SCREEN (readonly) ══ -->
+<div id="pinScreen">
+  <div style="width:48px;height:48px;background:var(--amber-bg);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  </div>
+  <h2>Acceso de visualización</h2>
+  <p>Ingresá el PIN para ver el dashboard</p>
+  <input class="pin-input inp" id="pinInput" type="password" maxlength="6" placeholder="••••••" oninput="checkPin()">
+  <div id="pinError" style="font-size:12px;color:var(--red);margin-top:4px;display:none">PIN incorrecto</div>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div id="app">
+  <div id="readonlyBanner" class="readonly-banner" style="display:none">
+    👁 Modo visualización — solo lectura
+  </div>
+  <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        </div>
+        <div>
+          <div class="logo-text">Control ROAS</div>
+          <div class="logo-sub">Meta Ads Dashboard</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Vistas</div>
+        <button class="nav-item active" onclick="switchPage('overview')" id="nav-overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Vista general
+        </button>
+        <button class="nav-item" onclick="switchPage('detail')" id="nav-detail">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Detalle de cuentas
+        </button>
+
+        <div class="nav-section-label" id="adminNavSection">Configuración</div>
+        <button class="nav-item" onclick="switchPage('accounts')" id="nav-accounts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Cuentas visibles
+        </button>
+        <button class="nav-item" onclick="switchPage('groups')" id="nav-groups">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M1 20c0-3 3-5 8-5s8 2 8 5"/><path d="M17 14c3 0 6 1.5 6 4"/></svg>
+          Grupos de cliente
+        </button>
+        <button class="nav-item" onclick="switchPage('history')" id="nav-history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><polyline points="3 16 3 11 8 11"/></svg>
+          Historial
+        </button>
+        <button class="nav-item" onclick="openShareModal()" id="nav-share">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Link de vista
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="user-info" id="userInfoSidebar">
+          <div class="avatar" id="avatarEl"></div>
+          <div class="user-name" id="userName"></div>
+        </div>
+        <div class="sync-info" id="lastSync"></div>
+        <button class="btn btn-sm btn-ghost" style="width:100%;margin-bottom:4px" onclick="refreshData()">↻ Sincronizar</button>
+        <button class="btn btn-sm btn-ghost btn-danger" style="width:100%" onclick="logout()" id="logoutBtn">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+
+      <!-- ── PAGE: OVERVIEW ── -->
+      <div class="page active" id="page-overview">
+        <div class="page-header">
+          <div class="page-title">Vista general</div>
+          <div class="controls" style="margin:0">
+            <select id="dateRange0" onchange="onDateChange0()">
+              <option value="this_month">Este mes</option>
+              <option value="last_7d">Últimos 7 días</option>
+              <option value="last_14d">Últimos 14 días</option>
+              <option value="last_30d">Últimos 30 días</option>
+              <option value="custom">Personalizado</option>
+            </select>
+            <span id="customDates0" style="display:none;gap:6px;align-items:center">
+              <input type="date" id="dateFrom0" class="inp" style="width:auto">
+              <span style="color:var(--text2)">→</span>
+              <input type="date" id="dateTo0" class="inp" style="width:auto">
+              <button class="btn btn-sm btn-primary" onclick="refreshData()">Aplicar</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="stat-grid" id="summaryCards"></div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">Evolución del período</span>
+            <div class="chart-legend" id="chartLegend"></div>
+          </div>
+          <div class="chart-wrap"><div id="mainChart"></div></div>
+        </div>
+
+        <div class="col-cfg" id="overviewColCfg" style="margin-bottom:12px"></div>
+        <div class="tbl-wrap">
+          <div class="tbl-scroll">
+            <table>
+              <thead><tr id="overviewHead"></tr></thead>
+              <tbody id="overviewBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PAGE: DETAIL ── -->
+      <div class="page" id="page-detail">
+        <div class="page-header">
+          <div class="page-title">Detalle de cuentas</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="exportReport('pdf')">⬇ PDF</button>
+            <button class="btn btn-sm" onclick="exportReport('excel')">⬇ Excel</button>
+          </div>
+        </div>
+        <div class="controls">
+          <select id="datePreset" onchange="applyPreset()">
+            <option value="this_month">Este mes</option>
+            <option value="last_7d">Últimos 7 días</option>
+            <option value="last_14d">Últimos 14 días</option>
+            <option value="last_30d">Últimos 30 días</option>
+            <option value="custom">Personalizado</option>
+          </select>
+          <span id="customDates1" style="display:none;gap:6px;align-items:center">
+            <input type="date" id="dateFrom1" class="inp" style="width:auto">
+            <span style="color:var(--text2)">→</span>
+            <input type="date" id="dateTo1" class="inp" style="width:auto">
+            <button class="btn btn-sm btn-primary" onclick="loadDetail()">Aplicar</button>
+          </span>
+          <select id="clientFilter" onchange="renderDetail()">
+            <option value="">Todas las cuentas</option>
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="loadDetail()">↻ Actualizar</button>
+        </div>
+        <div class="col-cfg" id="colCfg"></div>
+        <div class="tbl-wrap">
+          <div class="tbl-scroll">
+            <table>
+              <thead id="detailHead"></thead>
+              <tbody id="detailBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PAGE: ACCOUNTS MANAGER ── -->
+      <div class="page" id="page-accounts">
+        <div class="page-header">
+          <div class="page-title">Cuentas visibles</div>
+          <button class="btn btn-sm btn-primary" onclick="saveAccountVisibility()">Guardar cambios</button>
+        </div>
+        <div class="acc-manager">
+          <div class="acc-manager-title">
+            <span>Seleccioná qué cuentas mostrar en el dashboard</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-xs" onclick="toggleAllAccounts(true)">Todas</button>
+              <button class="btn btn-xs" onclick="toggleAllAccounts(false)">Ninguna</button>
+            </div>
+          </div>
+          <div class="acc-list" id="accList"></div>
+        </div>
+        <p style="font-size:12px;color:var(--text3);text-align:center">Las cuentas deshabilitadas no aparecerán en ninguna vista del dashboard</p>
+      </div>
+
+      <!-- ── PAGE: HISTORY ── -->
+      <div class="page" id="page-history">
+        <div class="page-header">
+          <div class="page-title">Historial de objetivos</div>
+          <div style="display:flex;gap:8px">
+            <select id="historyFilterAcc" onchange="renderHistoryPage()" style="font-size:13px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+              <option value="">Todas las cuentas</option>
+            </select>
+            <button class="btn btn-sm" onclick="exportHistoryExcel()">⬇ Excel</button>
+          </div>
+        </div>
+        <div id="historyContent"></div>
+      </div>
+
+      <!-- ── PAGE: GROUPS ── -->
+      <div class="page" id="page-groups">
+        <div class="page-header">
+          <div class="page-title">Grupos de cliente</div>
+          <button class="btn btn-sm btn-primary" onclick="openGroupModal()">+ Nuevo grupo</button>
+        </div>
+        <div id="groupsList" style="display:flex;flex-direction:column;gap:12px"></div>
+        <p style="font-size:12px;color:var(--text3);text-align:center;margin-top:16px">
+          Agrupá cuentas de un mismo cliente para verlas unificadas o juntas en el dashboard
+        </p>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ MODAL: CONFIGURE ACCOUNT ══ -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modalTitle">Configurar cuenta</h3>
+    <label>Objetivo mensual</label>
+    <input id="mObjective" type="number" placeholder="500000">
+    <label>Presupuesto mensual</label>
+    <input id="mBudget" type="number" placeholder="100000">
+    <label>Moneda</label>
+    <select id="mCurrency">
+      <option value="ARS">ARS — Peso argentino ($)</option>
+      <option value="USD">USD — Dólar estadounidense (U$D)</option>
+      <option value="EUR">EUR — Euro (€)</option>
+      <option value="BRL">BRL — Real brasileño (R$)</option>
+      <option value="MXN">MXN — Peso mexicano ($)</option>
+      <option value="CLP">CLP — Peso chileno ($)</option>
+    </select>
+    <label>Tipo de tracking</label>
+    <select id="mTracking">
+      <option value="ecommerce">E-commerce (compras web)</option>
+      <option value="messaging">Mensajería (WhatsApp / DM)</option>
+      <option value="both">Ambos (web + mensajería)</option>
+    </select>
+    <div id="mManualBlock" style="margin-top:14px;padding:12px;background:var(--amber-bg);border-radius:var(--radius);border:0.5px solid var(--amber);display:none">
+      <div style="font-size:12px;font-weight:600;color:var(--amber-tc);margin-bottom:6px">Ventas manuales del mes (mensajería)</div>
+      <div style="font-size:11px;color:var(--amber-tc);margin-bottom:8px;opacity:.8">Cargá las ventas informadas por el cliente. Se suman al revenue de Meta para calcular el progreso hacia el objetivo.</div>
+      <label style="font-size:12px;color:var(--amber-tc)">Revenue manual este mes</label>
+      <input id="mManualRevenue" type="number" placeholder="0" style="margin-top:4px">
+      <div id="mManualPreview" style="font-size:11px;color:var(--amber-tc);margin-top:6px"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModalDirect()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveModal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: SHARE ══ -->
+<div class="modal-overlay" id="shareModalOverlay" onclick="closeShareModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Link de visualización</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Generá un link de solo lectura con un PIN. El tercero podrá ver los datos pero no modificar nada.</p>
+    <label>PIN de acceso (4-6 dígitos)</label>
+    <input id="sharePin" type="number" placeholder="Ej: 1234" class="inp" style="margin-bottom:4px">
+    <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Elegí un PIN que puedas comunicarle al tercero</p>
+    <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="generateShareLink()">Generar link</button>
+    <div id="shareLinkResult" style="display:none">
+      <div class="divider"></div>
+      <p style="font-size:12px;font-weight:600;margin:12px 0 4px">Link generado:</p>
+      <div class="share-link" id="shareLinkUrl"></div>
+      <p style="font-size:12px;font-weight:600;margin:8px 0 4px">PIN para el tercero:</p>
+      <div class="pin-display" id="sharePinDisplay"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="copyShareLink()">Copiar link</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeShareModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: GROUP ══ -->
+<div class="modal-overlay" id="groupModalOverlay" onclick="closeGroupModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="width:460px">
+    <h3 id="groupModalTitle">Nuevo grupo de cliente</h3>
+
+    <label>Nombre del grupo</label>
+    <input id="gName" class="inp" placeholder="Ej: Tienda ABC (todas las cuentas)" style="margin-top:6px">
+
+    <label style="margin-top:14px">Modo de visualización</label>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <label style="flex:1;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);cursor:pointer;display:flex;align-items:flex-start;gap:8px" id="modeUnifiedLabel">
+        <input type="radio" name="gMode" value="unified" checked onchange="updateModeUI()" style="margin-top:2px;accent-color:var(--blue)">
+        <div>
+          <div style="font-size:13px;font-weight:600">Fila unificada</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Suma los datos en una sola fila con objetivo conjunto</div>
+        </div>
+      </label>
+      <label style="flex:1;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);cursor:pointer;display:flex;align-items:flex-start;gap:8px" id="modeGroupedLabel">
+        <input type="radio" name="gMode" value="grouped" onchange="updateModeUI()" style="margin-top:2px;accent-color:var(--blue)">
+        <div>
+          <div style="font-size:13px;font-weight:600">Filas agrupadas</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Filas separadas agrupadas visualmente bajo el nombre del cliente</div>
+        </div>
+      </label>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+      <div>
+        <label>Objetivo mensual del grupo</label>
+        <input id="gObjective" class="inp" type="number" placeholder="Ej: 2000000" style="margin-top:6px">
+      </div>
+      <div>
+        <label>Presupuesto mensual</label>
+        <input id="gBudget" class="inp" type="number" placeholder="Ej: 400000" style="margin-top:6px">
+      </div>
+    </div>
+    <label style="margin-top:10px">Moneda del grupo</label>
+    <select id="gCurrency" class="inp" style="margin-top:6px;width:100%">
+      <option value="ARS">ARS — Peso argentino ($)</option>
+      <option value="USD">USD — Dólar estadounidense (U$D)</option>
+      <option value="EUR">EUR — Euro (€)</option>
+      <option value="BRL">BRL — Real brasileño (R$)</option>
+      <option value="MXN">MXN — Peso mexicano ($)</option>
+      <option value="CLP">CLP — Peso chileno ($)</option>
+    </select>
+
+    <label style="margin-top:14px">Cuentas a incluir en el grupo</label>
+    <div id="gAccList" style="max-height:180px;overflow-y:auto;border:0.5px solid var(--border2);border-radius:var(--radius);padding:8px;margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
+
+    <div class="modal-btns">
+      <button class="btn" onclick="closeGroupModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveGroup()">Guardar grupo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// STATE — ALL declarations first
+// ══════════════════════════════════════
+
+// Date helpers (needed by currentMonthKey below)
+const today        = new Date();
+const dayOfMonth   = today.getDate();
+const daysInMonth  = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+const monthProgress = dayOfMonth / daysInMonth;
+const currentMonthKey = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
+
+// API / session
+let accessToken   = '';
+let fbUser        = {};
+let allAdAccounts = [];
+let adAccounts    = [];
+let accountsData  = [];
+
+// Persisted settings
+let settings      = JSON.parse(localStorage.getItem('cr_settings')  || '{}');
+let monthlyHistory= JSON.parse(localStorage.getItem('cr_history')   || '{}');
+let manualRevenue = JSON.parse(localStorage.getItem('cr_manual')    || '{}');
+let observations  = JSON.parse(localStorage.getItem('cr_obs')       || '{}');
+let hiddenAccs    = JSON.parse(localStorage.getItem('cr_hidden')    || '[]');
+let customNames   = JSON.parse(localStorage.getItem('cr_names')     || '{}');
+let clientGroups  = JSON.parse(localStorage.getItem('cr_groups')    || '{}');
+let groupSettings = JSON.parse(localStorage.getItem('cr_gsettings') || '{}');
+let colOrder      = JSON.parse(localStorage.getItem('cr_colorder')  || 'null');
+
+// Column definitions
+const BASE_COLS = [
+  { key:'spend',           label:'Invertido',           always:true  },
+  { key:'revenue',         label:'Facturado',            always:true  },
+  { key:'roas',            label:'ROAS',                 always:true  },
+  { key:'objetivo',        label:'Objetivo'              },
+  { key:'objPct',          label:'% Objetivo',           always:true  },
+  { key:'budgetPct',       label:'% Presupuesto',        always:true  },
+  { key:'ctr',             label:'CTR'                   },
+  { key:'clicks',          label:'Clics'                 },
+  { key:'purchases',       label:'Compras',              type:'ecommerce' },
+  { key:'addToCart',       label:'Agreg. carrito',       type:'ecommerce' },
+  { key:'checkouts',       label:'Pagos iniciados',      type:'ecommerce' },
+  { key:'costPerPurchase', label:'Costo x compra',       type:'ecommerce' },
+  { key:'messages',        label:'Mensajes',             type:'messaging' },
+  { key:'costPerMessage',  label:'Costo/msg',            type:'messaging' },
+];
+let visibleColKeys = new Set(JSON.parse(localStorage.getItem('cr_viscols') || 'null') ||
+  ['objetivo','spend','revenue','roas','objPct','budgetPct','ctr','clicks',
+   'purchases','addToCart','checkouts','costPerPurchase','messages','costPerMessage']);
+let colOrderArr = (colOrder && BASE_COLS.every(c => colOrder.includes(c.key)))
+  ? colOrder : BASE_COLS.map(c=>c.key);
+
+const OV_COLS = [
+  { key:'objetivo',    label:'Objetivo',      always:true },
+  { key:'progreso',    label:'Progreso',      always:true },
+  { key:'facturado',   label:'Facturado',     always:true },
+  { key:'invertido',   label:'Invertido'      },
+  { key:'presupuesto', label:'Presupuesto'    },
+  { key:'prespct',     label:'% Presupuesto'  },
+  { key:'roas',        label:'ROAS'           },
+  { key:'estado',      label:'Estado',        always:true },
+];
+let ovVisibleCols = new Set(JSON.parse(localStorage.getItem('cr_ovcols') ||
+  '["objetivo","progreso","facturado","invertido","presupuesto","prespct","roas","estado"]'));
+let ovColOrder    = JSON.parse(localStorage.getItem('cr_ovcolorder') || 'null') || OV_COLS.map(c=>c.key);
+
+
+// UI state
+let editingId     = null;
+let isReadonly    = false;
+let mainChart     = null;
+let currentPage   = 'overview';
+let detailLoaded  = false;
+let editingGid    = null;
+let dragTagKey    = null, dragTagTable = null;
+let dragColKey    = null, dragColTable = null;
+
+// Auto-archive: on load, check if last saved month != current month and archive if needed
+function checkMonthRollover() {
+  const lastMonth = localStorage.getItem('cr_lastmonth');
+  if (lastMonth && lastMonth !== currentMonthKey) {
+    // Archive each account's previous month data
+    Object.keys(settings).forEach(accId => {
+      const s = settings[accId]||{};
+      if (!s.objective) return;
+      if (!monthlyHistory[accId]) monthlyHistory[accId] = {};
+      // Only archive if we have data for that month
+      const prevData = monthlyHistory[accId][lastMonth];
+      if (!prevData || !prevData.archived) {
+        // Mark as needing data — will be filled when data loads
+        monthlyHistory[accId][lastMonth] = {
+          ...(prevData||{}),
+          objective: s.objective,
+          archived: true,
+        };
+      }
+    });
+    saveHistory();
+    // Reset manual revenue on month change
+    manualRevenue = {};
+    saveManualRevenue();
+  }
+  localStorage.setItem('cr_lastmonth', currentMonthKey);
+}
+
+// Archive current month's results for an account
+function archiveMonthResult(accId, revenue, spend) {
+  if (!monthlyHistory[accId]) monthlyHistory[accId] = {};
+  const s = settings[accId]||{};
+  const obj = s.objective||0;
+  const manRev = manualRevenue[accId]||0;
+  const totalRev = revenue + manRev;
+  monthlyHistory[accId][currentMonthKey] = {
+    objective:     obj,
+    revenue:       revenue,
+    revenueManual: manRev,
+    revenueTotal:  totalRev,
+    spend:         spend,
+    reached:       obj>0 && totalRev>=obj,
+    roas:          spend>0 ? totalRev/spend : 0,
+    archived:      true,
+  };
+  saveHistory();
+}
+
+
+function saveGroups() { localStorage.setItem('cr_groups', JSON.stringify(clientGroups)); }
+function saveGroupSettings() { localStorage.setItem('cr_gsettings', JSON.stringify(groupSettings)); }
+
+
+// Returns merged virtual account for a unified group
+function mergeGroupAccounts(group) {
+  const members = (group.accountIds||[])
+    .map(id => accountsData.find(a => a.id === id))
+    .filter(Boolean);
+  if (!members.length) return null;
+  const primary = members[0];
+  const s = settings[primary.id]||{};
+  const merged = {
+    id: 'group_' + Object.keys(clientGroups).find(k => clientGroups[k] === group),
+    name: group.name,
+    isGroup: true,
+    groupMode: group.mode,
+    memberIds: group.accountIds,
+    revenue: members.reduce((a,c)=>a+(c.revenue||0),0),
+    spend:   members.reduce((a,c)=>a+(c.spend||0),0),
+    impressions: members.reduce((a,c)=>a+(c.impressions||0),0),
+    clicks:      members.reduce((a,c)=>a+(c.clicks||0),0),
+    purchases:   members.reduce((a,c)=>a+(c.purchases||0),0),
+    addToCart:   members.reduce((a,c)=>a+(c.addToCart||0),0),
+    checkouts:   members.reduce((a,c)=>a+(c.checkouts||0),0),
+    messages:    members.reduce((a,c)=>a+(c.messages||0),0),
+  };
+  merged.ctr            = merged.clicks>0 ? (merged.clicks/(merged.impressions||merged.clicks)*100) : 0;
+  merged.costPerPurchase = merged.purchases>0 ? merged.spend/merged.purchases : 0;
+  merged.costPerMessage  = merged.messages>0  ? merged.spend/merged.messages  : 0;
+  // Attach group-level settings (objective, budget, currency) so semaphore works
+  const gid = Object.keys(clientGroups).find(k => clientGroups[k] === group);
+  const gs = groupSettings['group_'+gid] || {};
+  merged._groupSettings = gs;
+  return merged;
+}
+
+// Build the display list: unified groups as single rows, grouped-mode groups as groups, ungrouped as normal
+function buildDisplayList(sourceData) {
+  const groupedIds = new Set();
+  Object.values(clientGroups).forEach(g => (g.accountIds||[]).forEach(id => groupedIds.add(id)));
+
+  const rows = []; // { type: 'account'|'group-header'|'group-member'|'unified', data, group? }
+
+  // Add unified groups first
+  Object.entries(clientGroups).forEach(([gid, group]) => {
+    if (group.mode === 'unified') {
+      const merged = mergeGroupAccounts(group);
+      if (merged) rows.push({ type:'unified', data:{ ...merged, id:'group_'+gid }, gid });
+    } else {
+      // grouped mode: header + members
+      rows.push({ type:'group-header', gid, group });
+      (group.accountIds||[]).forEach(id => {
+        const acc = sourceData.find(a=>a.id===id);
+        if (acc) rows.push({ type:'group-member', data:acc, gid });
+      });
+    }
+  });
+
+  // Add ungrouped accounts
+  sourceData.filter(a => !groupedIds.has(a.id)).forEach(acc => {
+    rows.push({ type:'account', data:acc });
+  });
+
+  return rows;
+}
+// customNames[accId] = 'Alias visible'
+
+function displayName(accId, realName) {
+  return customNames[accId] || realName;
+}
+function saveCustomName(accId, val) {
+  if (val.trim()) customNames[accId] = val.trim();
+  else delete customNames[accId];
+  localStorage.setItem('cr_names', JSON.stringify(customNames));
+}
+
+// ══════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════
+const CURRENCY_SYMBOLS = { ARS:'$', USD:'U$D ', EUR:'€', BRL:'R$ ', MXN:'$', CLP:'$' };
+function fmtCurrency(n, accId) {
+  if (n == null || isNaN(n)) return '—';
+  const s = settings[accId] || {};
+  const cur = s.currency || 'ARS';
+  const sym = CURRENCY_SYMBOLS[cur] || '$';
+  return sym + new Intl.NumberFormat('es-AR', { maximumFractionDigits:0 }).format(n);
+}
+const fmtN   = n => (n == null || isNaN(n)) ? '—' : new Intl.NumberFormat('es-AR',{maximumFractionDigits:0}).format(n);
+const fmtDec = (n,d=2) => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(d);
+
+function totalRevenue(acc) {
+  // For groups, manualRevenue not applied individually (set on group level)
+  if (acc.isGroup) return acc.revenue||0;
+  return (acc.revenue||0) + (manualRevenue[acc.id]||0);
+}
+function semaphore(acc) {
+  const s = acc._groupSettings || settings[acc.id] || {};
+  if (!s.objective) return { color:'var(--gray)', label:'Sin objetivo', bg:'var(--gray-bg)', tc:'var(--gray-tc)' };
+  const projected = (totalRevenue(acc) / s.objective) / monthProgress;
+  if (projected >= 0.92) return { color:'var(--green)', label:'En objetivo',       bg:'var(--green-bg)', tc:'var(--green-tc)' };
+  if (projected >= 0.65) return { color:'var(--amber)', label:'En riesgo',         bg:'var(--amber-bg)', tc:'var(--amber-tc)' };
+  return                         { color:'var(--red)',   label:'Fuera de objetivo', bg:'var(--red-bg)',   tc:'var(--red-tc)'   };
+}
+function pbar(pct, color) {
+  const c = Math.min(pct,100);
+  return `<div class="prog"><div class="prog-bar"><div class="prog-fill" style="width:${c}%;background:${color}"></div></div><span class="prog-pct" style="color:${color}">${Math.round(pct)}%</span></div>`;
+}
+function getDateParams(selectId, fromId, toId) {
+  const val = (document.getElementById(selectId)||{}).value || 'this_month';
+  if (val === 'custom') {
+    const f = document.getElementById(fromId).value;
+    const t = document.getElementById(toId).value;
+    if (f && t) return { since:f, until:t };
+  }
+  const now = new Date();
+  if (val === 'this_month') {
+    const y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,'0');
+    return { since:`${y}-${m}-01`, until:`${y}-${m}-${String(now.getDate()).padStart(2,'0')}` };
+  }
+  const days = { last_7d:7, last_14d:14, last_30d:30 }[val] || 7;
+  const since = new Date(now - days*864e5);
+  return { since:since.toISOString().slice(0,10), until:now.toISOString().slice(0,10) };
+}
+function showAlert(msg, type='err') {
+  const el = document.getElementById('alertMsg');
+  if (!el) { alert(msg); return; }
+  el.textContent = msg; el.className = 'alert alert-'+(type==='ok'?'ok':'err'); el.style.display='block';
+  setTimeout(()=>el.style.display='none', 6000);
+}
+
+// ══════════════════════════════════════
+// READONLY / PIN
+// ══════════════════════════════════════
+function checkReadonly() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('view') === '1') {
+    isReadonly = true;
+    document.getElementById('configScreen').style.display = 'none';
+    document.getElementById('pinScreen').style.display = 'block';
+    return true;
+  }
+  return false;
+}
+function checkPin() {
+  const pin = document.getElementById('pinInput').value;
+  const storedPin = localStorage.getItem('cr_sharepin');
+  if (!storedPin) { document.getElementById('pinError').style.display='block'; document.getElementById('pinError').textContent='No hay un PIN configurado. Pedile al admin que genere un link.'; return; }
+  if (pin === storedPin) {
+    document.getElementById('pinScreen').style.display = 'none';
+    document.getElementById('pinError').style.display = 'none';
+    // In readonly mode, load with stored token if available — otherwise show message
+    const storedData = localStorage.getItem('cr_lastdata');
+    if (storedData) {
+      accountsData = JSON.parse(storedData);
+      adAccounts = accountsData;
+      launchApp(true);
+    } else {
+      document.getElementById('pinError').style.display='block';
+      document.getElementById('pinError').textContent='No hay datos almacenados. El admin debe abrir el dashboard primero.';
+    }
+  } else {
+    document.getElementById('pinError').style.display='block';
+    document.getElementById('pinError').textContent='PIN incorrecto';
+    document.getElementById('pinInput').value='';
+  }
+}
+
+// ══════════════════════════════════════
+// FB LOGIN
+// ══════════════════════════════════════
+function initFBLogin() {
+  const appId = (document.getElementById('appIdInput').value||'').trim();
+  if (!appId || appId.length < 10) { showAlert('Ingresá un App ID válido'); return; }
+  if (typeof FB === 'undefined') { showAlert('SDK de Facebook no cargó. Verificá el dominio en tu app de Meta.'); return; }
+  FB.init({ appId, cookie:true, xfbml:false, version:'v19.0' });
+  localStorage.setItem('cr_appid', appId);
+  FB.login(res => {
+    if (res.authResponse) {
+      accessToken = res.authResponse.accessToken;
+      loadUserAndAccounts();
+    } else {
+      showAlert('Login cancelado o permisos denegados.');
+    }
+  }, { scope:'ads_read,ads_management,business_management,public_profile' });
+}
+
+// Auto-login: called once FB SDK is ready (via fbAsyncInit)
+function tryAutoLogin(appId) {
+  FB.init({ appId, cookie:true, xfbml:false, version:'v19.0' });
+  updateLoginLoadingMsg('Verificando sesión de Facebook...');
+  FB.getLoginStatus(res => {
+    if (res.status === 'connected') {
+      updateLoginLoadingMsg('Sesión activa. Cargando cuentas...');
+      accessToken = res.authResponse.accessToken;
+      loadUserAndAccounts();
+    } else {
+      // Session expired — hide overlay, show login form with App ID pre-filled
+      hideLoginLoading();
+      const inp = document.getElementById('appIdInput');
+      if (inp) inp.value = appId;
+    }
+  });
+}
+
+// Fetch ALL pages from a Meta Graph API paginated endpoint
+function fetchAllPages(url, params) {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    function next(u, p) {
+      FB.api(u, 'GET', p || {}, res => {
+        if (!res) return reject(new Error('Sin respuesta de la API de Meta'));
+        if (res.error) return reject(new Error(res.error.message || JSON.stringify(res.error)));
+        (res.data || []).forEach(item => results.push(item));
+        // paging.cursors.after — use cursor-based pagination, not full URL
+        if (res.paging && res.paging.cursors && res.paging.cursors.after && res.data && res.data.length > 0) {
+          const nextParams = { ...(p||{}), after: res.paging.cursors.after };
+          next(u, nextParams);
+        } else {
+          resolve(results);
+        }
+      });
+    }
+    next(url, params);
+  });
+}
+
+const ACC_STATUS_LABELS = {
+  1:'Activa', 2:'Deshabilitada', 3:'Sin confirmar', 7:'Archivada',
+  8:'Cancelada', 9:'Fraude', 100:'Cerrada', 101:'Cerrada', 201:'Pausada agencia'
+};
+
+function loadUserAndAccounts() {
+  showLoginLoading('Conectando con Meta Ads...');
+  FB.api('/me','GET',{ fields:'name,picture', access_token:accessToken }, user => {
+    if (!user || user.error) {
+      hideLoginLoading();
+      showAlertSafe('No se pudo obtener tu perfil de Facebook. Intentá reconectar.');
+      return;
+    }
+    fbUser = user;
+    updateLoginLoadingMsg('Trayendo cuentas publicitarias...');
+    fetchAllPages('/me/adaccounts', {
+      fields: 'name,account_id,account_status,currency',
+      limit: 100,
+      access_token: accessToken
+    })
+    .then(accounts => {
+      console.log('[MetaDash] Cuentas recibidas:', accounts.length, accounts.map(a=>a.name));
+      const seen = new Set();
+      allAdAccounts = accounts.filter(a => {
+        if (seen.has(a.id)) return false;
+        seen.add(a.id); return true;
+      });
+      if (allAdAccounts.length === 0) {
+        hideLoginLoading();
+        showAlertSafe('Tu usuario de Facebook no tiene cuentas publicitarias asociadas, o no tiene permisos suficientes. Revisá que hayas aceptado todos los permisos al hacer login.');
+        return Promise.reject(new Error('skip'));
+      }
+      updateLoginLoadingMsg(`${allAdAccounts.length} cuentas encontradas. Cargando datos...`);
+      applyAccountVisibility();
+      return loadOverview();
+    })
+    .then(() => {
+      hideLoginLoading();
+      launchApp(false);
+    })
+    .catch(err => {
+      if (err && err.message === 'skip') return;
+      hideLoginLoading();
+      console.error('[MetaDash] Error:', err);
+      showAlertSafe('Error al cargar cuentas: ' + (err.message || JSON.stringify(err)));
+    });
+  });
+}
+
+// Safe alert that works even if alertMsg element is gone
+function showAlertSafe(msg) {
+  const el = document.getElementById('alertMsg');
+  if (el) {
+    el.textContent = msg;
+    el.className = 'alert alert-err';
+    el.style.display = 'block';
+    setTimeout(()=>el.style.display='none', 8000);
+  } else {
+    alert(msg);
+  }
+}
+
+function applyAccountVisibility() {
+  adAccounts = allAdAccounts.filter(a => !hiddenAccs.includes(a.id));
+  // Safety: if ALL accounts are hidden, reset hiddenAccs (probably a stale list from old account IDs)
+  if (adAccounts.length === 0 && allAdAccounts.length > 0) {
+    console.warn('[MetaDash] All accounts hidden — resetting hiddenAccs');
+    hiddenAccs = [];
+    localStorage.setItem('cr_hidden', '[]');
+    adAccounts = [...allAdAccounts];
+  }
+  console.log('[MetaDash] applyAccountVisibility: allAdAccounts=', allAdAccounts.length, '→ adAccounts=', adAccounts.length);
+}
+
+function launchApp(readonly) {
+  document.getElementById('configScreen').style.display = 'none';
+  document.getElementById('pinScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  if (readonly) {
+    document.getElementById('readonlyBanner').style.display = 'block';
+    document.getElementById('adminNavSection').style.display = 'none';
+    document.getElementById('nav-accounts').style.display = 'none';
+    document.getElementById('nav-groups').style.display = 'none';
+    document.getElementById('nav-history').style.display = 'none';
+    document.getElementById('nav-share').style.display = 'none';
+    document.getElementById('logoutBtn').style.display = 'none';
+    document.getElementById('userInfoSidebar').style.display = 'none';
+  } else {
+    // set user pill
+    const avatarEl = document.getElementById('avatarEl');
+    if (fbUser.picture && fbUser.picture.data) {
+      avatarEl.innerHTML = `<img src="${fbUser.picture.data.url}" alt="">`;
+    } else {
+      avatarEl.textContent = (fbUser.name||'U')[0].toUpperCase();
+    }
+    document.getElementById('userName').textContent = fbUser.name || '';
+    // populate client filter
+    const sel = document.getElementById('clientFilter');
+    adAccounts.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.name}</option>`);
+    renderAccountsPage();
+  }
+  checkMonthRollover();
+  buildColCfg();
+  buildOverviewColCfg();
+  renderGroupsPage();
+  renderOverview();
+}
+
+// ══════════════════════════════════════
+// DATA FETCH
+// ══════════════════════════════════════
+function fetchInsights(accountId, dp) {
+  return new Promise(resolve => {
+    if (!accessToken) { console.warn('[MetaDash] fetchInsights: no accessToken'); return resolve({ spend:0,clicks:0,ctr:0,revenue:0,purchases:0,addToCart:0,checkouts:0,costPerPurchase:0,messages:0,costPerMessage:0 }); }
+    const fields = 'spend,clicks,ctr,actions,action_values,cost_per_action_type';
+    FB.api(`/${accountId}/insights`,'GET',
+      { fields, time_range:JSON.stringify(dp), level:'account', access_token:accessToken },
+      res => {
+        if (res && res.error) console.warn('[MetaDash] Insights error for', accountId, res.error.message);
+        if (!res||!res.data||!res.data.length) return resolve({ spend:0,clicks:0,ctr:0,revenue:0,purchases:0,addToCart:0,checkouts:0,costPerPurchase:0,messages:0,costPerMessage:0 });
+        const d = res.data[0];
+        const ga = (arr,type) => { const f=(arr||[]).find(a=>a.action_type===type); return f?parseFloat(f.value):0; };
+        const purchases = ga(d.actions,'purchase')||ga(d.actions,'offsite_conversion.fb_pixel_purchase');
+        const messages  = ga(d.actions,'onsite_conversion.messaging_conversation_started_7d')||ga(d.actions,'onsite_conversion.total_messaging_connection');
+        const spend     = parseFloat(d.spend)||0;
+        resolve({
+          spend,
+          clicks:          parseInt(d.clicks)||0,
+          ctr:             parseFloat(d.ctr)||0,
+          revenue:         ga(d.action_values,'purchase')||ga(d.action_values,'offsite_conversion.fb_pixel_purchase'),
+          purchases,
+          addToCart:       ga(d.actions,'add_to_cart')||ga(d.actions,'offsite_conversion.fb_pixel_add_to_cart'),
+          checkouts:       ga(d.actions,'initiate_checkout')||ga(d.actions,'offsite_conversion.fb_pixel_initiate_checkout'),
+          costPerPurchase: purchases>0 ? spend/purchases : 0,
+          messages,
+          costPerMessage:  messages>0  ? spend/messages  : 0,
+        });
+      }
+    );
+  });
+}
+
+async function loadOverview() {
+  const dp = getDateParams('dateRange0','dateFrom0','dateTo0');
+  accountsData = await Promise.all(adAccounts.map(async acc => {
+    const ins = await fetchInsights(acc.id, dp);
+    return { ...acc, ...ins };
+  }));
+  localStorage.setItem('cr_lastdata', JSON.stringify(accountsData));
+  const syncEl = document.getElementById('lastSync');
+  if (syncEl) syncEl.textContent = 'Sync: ' + new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadDetail() {
+  const dp = getDateParams('datePreset','dateFrom1','dateTo1');
+  document.getElementById('detailBody').innerHTML = `<tr><td colspan="20"><div class="loading" style="display:flex"><div class="spinner"></div><p>Cargando...</p></div></td></tr>`;
+  accountsData = await Promise.all(adAccounts.map(async acc => {
+    const ins = await fetchInsights(acc.id, dp);
+    return { ...acc, ...ins };
+  }));
+  localStorage.setItem('cr_lastdata', JSON.stringify(accountsData));
+  detailLoaded = true;
+  renderDetail();
+}
+
+async function refreshData() {
+  if (currentPage === 'overview') { await loadOverview(); renderOverview(); }
+  else if (currentPage === 'detail') { await loadDetail(); }
+}
+
+// ══════════════════════════════════════
+// RENDER OVERVIEW
+// ══════════════════════════════════════
+function renderOverview() {
+  const totalRev   = accountsData.reduce((a,c)=>a+(c.revenue||0),0);
+  const totalSpend = accountsData.reduce((a,c)=>a+(c.spend||0),0);
+  const avgRoas    = totalSpend>0 ? totalRev/totalSpend : 0;
+  const onTrack    = accountsData.filter(c=>semaphore(c).label==='En objetivo').length;
+
+  // Build mixed-currency totals per currency for display
+  const revByCur = {}, spendByCur = {};
+  accountsData.forEach(a => {
+    const cur = (settings[a.id]||{}).currency||'ARS';
+    const sym = CURRENCY_SYMBOLS[cur]||'$';
+    revByCur[sym]   = (revByCur[sym]  ||0) + (a.revenue||0);
+    spendByCur[sym] = (spendByCur[sym]||0) + (a.spend  ||0);
+  });
+  const fmtMixed = obj => Object.entries(obj).map(([sym,v]) => sym+fmtN(Math.round(v))).join(' + ') || '—';
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Facturación</div><div class="stat-value" style="font-size:${Object.keys(revByCur).length>1?'16px':'22px'}">${fmtMixed(revByCur)}</div><div class="stat-sub">Revenue total de conversiones</div></div>
+    <div class="stat-card"><div class="stat-label">Inversión</div><div class="stat-value" style="font-size:${Object.keys(spendByCur).length>1?'16px':'22px'}">${fmtMixed(spendByCur)}</div><div class="stat-sub">Gasto total en Meta Ads</div></div>
+    <div class="stat-card"><div class="stat-label">ROAS promedio</div><div class="stat-value">×${fmtDec(avgRoas)}</div><div class="stat-sub">Retorno sobre inversión</div></div>
+    <div class="stat-card"><div class="stat-label">En objetivo</div><div class="stat-value">${onTrack} / ${accountsData.length}</div><div class="stat-sub">Cuentas activas</div></div>
+  `;
+
+  renderChart();
+
+  // Overview table — configurable columns
+  buildOverviewColCfg();
+  const activeOvCols = ovColOrder.map(k=>OV_COLS.find(c=>c.key===k)).filter(c=>c&&(c.always||ovVisibleCols.has(c.key)));
+  const ovHeadRow = document.getElementById('overviewHead');
+  ovHeadRow.innerHTML = '';
+  // "Cuenta" fixed, not draggable
+  const thCuentaOv = document.createElement('th');
+  thCuentaOv.textContent = 'Cuenta';
+  ovHeadRow.appendChild(thCuentaOv);
+  // All other columns: draggable
+  activeOvCols.forEach(c => {
+    const th = document.createElement('th');
+    th.textContent = c.label;
+    makeDraggableTh(th, c.key, 'ov');
+    ovHeadRow.appendChild(th);
+  });
+  const thActOv = document.createElement('th');
+  ovHeadRow.appendChild(thActOv);
+
+  const body = document.getElementById('overviewBody');
+  body.innerHTML = '';
+  console.log('[MetaDash] renderOverview: accountsData=', accountsData.length, 'adAccounts=', adAccounts.length, 'allAdAccounts=', allAdAccounts.length);
+  if (!accountsData.length) {
+    body.innerHTML = `<tr><td colspan="10"><div class="empty"><p>No hay cuentas activas para mostrar.</p></div></td></tr>`;
+    return;
+  }
+  function renderAccRow(acc, indent) {
+    const s = acc._groupSettings || settings[acc.id] || {};
+    const obj = s.objective||0;
+    const bud = s.budget||0;
+    const roas = acc.spend>0 ? totalRevenue(acc)/acc.spend : 0;
+    const objPct = obj>0 ? Math.round(totalRevenue(acc)/obj*100) : 0;
+    const budPct = bud>0 ? Math.round(acc.spend/bud*100) : 0;
+    const sem = semaphore(acc);
+    const bc = budPct>100?'var(--red)':budPct>85?'var(--amber)':'var(--green)';
+    const cur = s.currency||'ARS';
+    const sym = CURRENCY_SYMBOLS[cur]||'$';
+    const tr = document.createElement('tr');
+    tr.className = 'clickable';
+    const indentStyle = indent ? 'padding-left:28px' : '';
+    const groupBadge = acc.isGroup
+      ? `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:var(--blue-bg);color:var(--blue)">GRUPO</span>`
+      : '';
+    let cells = `<td style="font-weight:600;${indentStyle}">
+        <div style="display:flex;align-items:center;gap:6px">
+          ${indent ? '<span style="color:var(--text3);font-size:12px">└</span>' : ''}
+          <span onclick="${acc.isGroup ? '' : `startRenameOverview('${acc.id}',event)`}"
+                title="${acc.isGroup ? 'Grupo: '+acc.name : 'Nombre real: '+acc.name}"
+                id="dname-ov-${acc.id}"
+                style="${acc.isGroup ? '' : 'cursor:text;border-bottom:1px dashed var(--border2);padding-bottom:1px'}">
+            ${acc.isGroup ? acc.name : displayName(acc.id,acc.name)}
+          </span>
+          ${groupBadge}
+          ${!acc.isGroup ? `<span class="acc-currency-badge">${cur}</span>` : ''}
+        </div>
+      </td>`;
+    activeOvCols.forEach(c => {
+      if (c.key==='objetivo')        cells += `<td>${obj?sym+fmtN(obj):'<span style="color:var(--text3);font-size:12px">Sin configurar</span>'}</td>`;
+      else if(c.key==='progreso')    cells += `<td>${obj?pbar(objPct,sem.color):'—'}</td>`;
+      else if(c.key==='facturado')   cells += `<td>${acc.isGroup ? sym+fmtN(Math.round(acc.revenue)) : fmtCurrency(acc.revenue,acc.id)}</td>`;
+      else if(c.key==='invertido')   cells += `<td>${acc.isGroup ? sym+fmtN(Math.round(acc.spend)) : fmtCurrency(acc.spend,acc.id)}</td>`;
+      else if(c.key==='presupuesto') cells += `<td>${bud?sym+fmtN(bud):'—'}</td>`;
+      else if(c.key==='prespct')     cells += `<td>${bud?pbar(budPct,bc):'—'}</td>`;
+      else if(c.key==='roas')        cells += `<td style="font-weight:700">×${fmtDec(roas)}</td>`;
+      else if(c.key==='estado')      cells += `<td><span class="badge" style="background:${sem.bg};color:${sem.tc}"><span class="dot" style="background:${sem.color}"></span>${sem.label}</span></td>`;
+    });
+    cells += `<td><div class="row-actions">
+        ${!isReadonly && !acc.isGroup ? `<button class="btn btn-xs" onclick="openModal('${acc.id}','${acc.name}',event)">Config</button>` : ''}
+        ${!isReadonly && !acc.isGroup ? `<button class="btn btn-xs btn-danger" onclick="hideAccount('${acc.id}',event)">Ocultar</button>` : ''}
+        ${!isReadonly && acc.isGroup ? `<button class="btn btn-xs" onclick="switchPage('groups')">Editar grupo</button>` : ''}
+      </div></td>`;
+    tr.innerHTML = cells;
+    body.appendChild(tr);
+  }
+
+  const displayList = buildDisplayList(accountsData);
+  displayList.forEach(row => {
+    if (row.type === 'group-header') {
+      const sep = document.createElement('tr');
+      sep.innerHTML = `<td colspan="20" style="padding:8px 12px 4px;font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;background:var(--blue-bg);border-top:2px solid var(--blue)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:middle"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M1 20c0-3 3-5 8-5s8 2 8 5"/><path d="M17 14c3 0 6 1.5 6 4"/></svg>
+        ${row.group.name}
+      </td>`;
+      body.appendChild(sep);
+    } else if (row.type === 'group-member') {
+      renderAccRow(row.data, true);
+    } else {
+      renderAccRow(row.data, false);
+    }
+  });
+}
+
+// ══════════════════════════════════════
+// CHART — horizontal progress bars (SVG)
+// ══════════════════════════════════════
+function renderChart() {
+  const wrap = document.getElementById('mainChart');
+  if (!wrap) return;
+
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const textPrimary   = isDark ? '#f0efe9' : '#1a1a18';
+  const textSecondary = isDark ? '#a0a09a' : '#6b6b67';
+  const bgTrack       = isDark ? '#2e2e2b' : '#ede';
+
+  const ROW_H   = 44;   // height per client row
+  const LABEL_W = 160;  // left label column
+  const RIGHT_W = 160;  // right info column
+  const PADDING = 16;
+
+  // Build display list respecting groups (same as table)
+  const displayList = buildDisplayList(accountsData);
+  const chartItems = displayList
+    .filter(row => row.type !== 'group-header') // skip visual-only headers
+    .map(row => {
+      const a = row.data;
+      const s = a._groupSettings || settings[a.id] || {};
+      const obj = s.objective||0;
+      const rev = a.revenue||0;
+      const spend = a.spend||0;
+      const roas = spend>0 ? (rev/spend) : 0;
+      const pct  = obj>0 ? Math.min(rev/obj, 1.05) : 0;
+      const sem  = semaphore(a);
+      const cur  = s.currency||'ARS';
+      const sym  = CURRENCY_SYMBOLS[cur]||'$';
+      const dname = a.isGroup ? a.name : displayName(a.id, a.name);
+      // For group-members, indent name
+      const label = row.type==='group-member' ? '  └ '+dname : dname;
+      return { name:label, obj, rev, spend, roas, pct, sem, sym, cur, id:a.id, isGroup:a.isGroup||false };
+    });
+  const data = chartItems;
+
+  const HEADER_H = 24; // extra space for column headers
+  const svgH = Math.max(data.length * ROW_H + PADDING * 2 + HEADER_H, 60);
+
+  // Build SVG rows
+  let rows = '';
+  // Column header row (placeholder — fixed after width calc)
+  rows += `<g id="chartHeaders"></g>`;
+  data.forEach((d, i) => {
+    const y = PADDING + HEADER_H + i * ROW_H;
+    const cy = y + ROW_H / 2;
+    const barY = cy - 8;
+    const barH = 16;
+
+    // truncate name
+    const name = d.name.length > 22 ? d.name.slice(0,20)+'…' : d.name;
+
+    // fill width for the track (available = total - label - right - gaps)
+    // we compute dynamically via JS attr, but in SVG we use foreignObject for the bar
+    const barColor = d.sem.color;
+
+    // ROAS indicator color
+    const roasColor = d.roas >= 3 ? '#1D9E75' : d.roas >= 1.5 ? '#EF9F27' : '#E24B4A';
+
+    // Revenue formatted short
+    const revShort = d.rev >= 1e6 ? (d.rev/1e6).toFixed(1)+'M' :
+                     d.rev >= 1e3 ? (d.rev/1e3).toFixed(0)+'K' : Math.round(d.rev).toString();
+
+    rows += `
+      <!-- row ${i}: ${name} -->
+      <g class="chart-row">
+        <!-- semaphore dot + name -->
+        <circle cx="${PADDING + 6}" cy="${cy}" r="5" fill="${barColor}"/>
+        <text x="${PADDING + 16}" y="${cy + 4}" font-size="12" fill="${textPrimary}" font-family="-apple-system,sans-serif" font-weight="500">${name}</text>
+
+        <!-- track background -->
+        <rect x="${LABEL_W}" y="${barY}" width="TRACKW" height="${barH}" rx="4" fill="${isDark?'#2e2e2b':'#ebebeb'}"/>
+
+        <!-- progress fill -->
+        <rect x="${LABEL_W}" y="${barY}" width="FILLW_${i}" height="${barH}" rx="4" fill="${barColor}" opacity="0.85"/>
+
+        <!-- objective marker line at 100% -->
+        ${d.obj > 0 ? `<line x1="MARKERX" y1="${barY - 3}" x2="MARKERX" y2="${barY + barH + 3}" stroke="${isDark?'rgba(255,255,255,0.3)':'rgba(0,0,0,0.2)'}" stroke-width="1.5" stroke-dasharray="3,2"/>` : ''}
+
+        <!-- revenue label INSIDE bar (right-aligned to fill end) -->
+        ${d.obj > 0 && d.pct > 0.18 ? `<text x="REVTX_${i}" y="${cy + 4}" font-size="10" font-weight="700" fill="rgba(255,255,255,0.95)" font-family="-apple-system,sans-serif" text-anchor="end">${d.sym}${revShort}</text>` : ''}
+        <!-- revenue outside bar when too short -->
+        ${(d.obj === 0 || d.pct <= 0.18) ? `<text x="REVOUTX_${i}" y="${cy + 4}" font-size="10" font-weight="600" fill="${textSecondary}" font-family="-apple-system,sans-serif">${d.sym}${revShort}</text>` : ''}
+
+        <!-- % pct small label above bar left -->
+        ${d.obj > 0 ? `<text x="${LABEL_W + 4}" y="${barY - 2}" font-size="9" font-weight="700" fill="${barColor}" font-family="-apple-system,sans-serif">${Math.round(d.pct*100)}%</text>` : ''}
+
+        <!-- right side: ROAS chip only -->
+        <rect x="ROASX" y="${barY + 1}" width="48" height="14" rx="3" fill="${roasColor}22"/>
+        <text x="ROASTX" y="${barY + 11}" font-size="10" font-weight="700" fill="${roasColor}" font-family="-apple-system,sans-serif" text-anchor="middle">×${d.roas.toFixed(1)}</text>
+      </g>`;
+  });
+
+  // We'll inject a real SVG and then fix widths via JS after render
+  wrap.innerHTML = `<svg id="hbarSvg" width="100%" height="${svgH}" xmlns="http://www.w3.org/2000/svg">${rows}</svg>`;
+
+  // Now fix dynamic widths using JS
+  const svg = document.getElementById('hbarSvg');
+  const totalW = svg.getBoundingClientRect().width || 600;
+  const trackW = totalW - LABEL_W - 64 - 8;  // 64 = ROAS chip width only
+  const markerX = LABEL_W + trackW;
+  const rightX  = LABEL_W + trackW + 10;
+  const roasX   = LABEL_W + trackW + 76;
+  const roasTX  = roasX + 22;
+
+  let svgHTML = svg.innerHTML;
+  // Reduce RIGHT_W since we only show ROAS chip now (not revenue text)
+  const ROAS_W = 56;
+  const roasChipX  = LABEL_W + trackW + 8;
+  const roasChipTX = roasChipX + 24;
+
+  svgHTML = svgHTML.replace(/width="TRACKW"/g, `width="${Math.max(trackW,0)}"`);
+  data.forEach((d, i) => {
+    const fillW = Math.max(Math.min(d.pct, 1) * trackW, d.pct > 0 ? 4 : 0);
+    svgHTML = svgHTML.replace(`width="FILLW_${i}"`, `width="${fillW.toFixed(1)}"`);
+    // Revenue inside bar: 6px from right edge of fill
+    const revInsideX = LABEL_W + fillW - 4;
+    svgHTML = svgHTML.replace(`x="REVTX_${i}"`,    `x="${revInsideX.toFixed(1)}"`);
+    // Revenue outside bar: just after fill end + 4px
+    const revOutX = LABEL_W + Math.max(fillW, 4) + 6;
+    svgHTML = svgHTML.replace(`x="REVOUTX_${i}"`,  `x="${revOutX.toFixed(1)}"`);
+  });
+  svgHTML = svgHTML.replace(/x1="MARKERX"/g, `x1="${markerX.toFixed(1)}"`);
+  svgHTML = svgHTML.replace(/x2="MARKERX"/g, `x2="${markerX.toFixed(1)}"`);
+  svgHTML = svgHTML.replace(/x="ROASX"/g,    `x="${roasChipX.toFixed(1)}"`);
+  svgHTML = svgHTML.replace(/x="ROASTX"/g,   `x="${roasChipTX.toFixed(1)}"`);
+  svg.innerHTML = svgHTML;
+
+  // Inject column header labels now that we know positions
+  const headerEl = svg.querySelector('#chartHeaders');
+  if (headerEl) {
+    headerEl.innerHTML = `
+      <text x="${LABEL_W}" y="${PADDING + 14}" font-size="10" font-weight="700"
+            fill="${textSecondary}" font-family="-apple-system,sans-serif">PROGRESO DEL OBJETIVO</text>
+      <text x="${(roasChipX).toFixed(1)}" y="${PADDING + 14}" font-size="10" font-weight="700"
+            fill="${textSecondary}" font-family="-apple-system,sans-serif">ROAS</text>
+    `;
+  }
+
+  // Legend
+  document.getElementById('chartLegend').innerHTML = `
+    <div class="legend-item"><span class="legend-dot" style="background:#1D9E75"></span>En objetivo</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#EF9F27"></span>En riesgo</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>Fuera de objetivo</div>
+    <div style="font-size:11px;color:${textSecondary};margin-left:6px">· facturado dentro de la barra &nbsp;·&nbsp; línea = 100% del objetivo</div>
+  `;
+}
+
+
+function buildOverviewColCfg() {
+  const wrap = document.getElementById('overviewColCfg');
+  if (!wrap) return;
+  // Render in ovColOrder, all cols (always shown fixed, optional togglable)
+  const ordered = ovColOrder.map(k=>OV_COLS.find(c=>c.key===k)).filter(Boolean);
+  wrap.innerHTML = '<span class="col-cfg-label" style="margin-right:6px">Columnas</span>' +
+    ordered.map(c => {
+      const checked = c.always || ovVisibleCols.has(c.key);
+      const fixedStyle = c.always ? 'opacity:.5;pointer-events:none' : '';
+      return `<div class="ctog-drag" draggable="true"
+                   data-key="${c.key}" data-table="ov"
+                   ondragstart="onTagDragStart(event)"
+                   ondragover="onTagDragOver(event)"
+                   ondrop="onTagDrop(event,'ov')"
+                   ondragend="onTagDragEnd(event)"
+                   style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:0.5px solid var(--border);border-radius:20px;background:${checked?'var(--blue-bg)':'var(--bg2)'};color:${checked?'var(--blue)':'var(--text2)'};font-size:12px;cursor:grab;user-select:none;${fixedStyle}">
+               <span style="font-size:10px;opacity:.4;cursor:grab">⠿</span>
+               <input type="checkbox" ${checked?'checked':''} ${c.always?'disabled':''}
+                      onchange="toggleOvCol('${c.key}',this.checked)"
+                      style="accent-color:var(--blue);margin:0;cursor:pointer">
+               ${c.label}
+             </div>`;
+    }).join('');
+}
+function toggleOvCol(key, val) {
+  val ? ovVisibleCols.add(key) : ovVisibleCols.delete(key);
+  localStorage.setItem('cr_ovcols', JSON.stringify([...ovVisibleCols]));
+  renderOverview();
+}
+
+// ══════════════════════════════════════
+// RENDER DETAIL
+// ══════════════════════════════════════
+function buildColCfg() {
+  const wrap = document.getElementById('colCfg');
+  if (!wrap) return;
+  const ordered = colOrderArr.map(k=>BASE_COLS.find(c=>c.key===k)).filter(Boolean);
+  wrap.innerHTML = '<span class="col-cfg-label" style="margin-right:6px">Columnas</span>' +
+    ordered.map(c => {
+      const checked = c.always || visibleColKeys.has(c.key);
+      const fixedStyle = c.always ? 'opacity:.5;pointer-events:none' : '';
+      return `<div class="ctog-drag" draggable="true"
+                   data-key="${c.key}" data-table="det"
+                   ondragstart="onTagDragStart(event)"
+                   ondragover="onTagDragOver(event)"
+                   ondrop="onTagDrop(event,'det')"
+                   ondragend="onTagDragEnd(event)"
+                   style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:0.5px solid var(--border);border-radius:20px;background:${checked?'var(--blue-bg)':'var(--bg2)'};color:${checked?'var(--blue)':'var(--text2)'};font-size:12px;cursor:grab;user-select:none;${fixedStyle}">
+               <span style="font-size:10px;opacity:.4;cursor:grab">⠿</span>
+               <input type="checkbox" ${checked?'checked':''} ${c.always?'disabled':''}
+                      onchange="toggleCol('${c.key}',this.checked)"
+                      style="accent-color:var(--blue);margin:0;cursor:pointer">
+               ${c.label}${c.type?` <span style="font-size:10px;opacity:.5">(${c.type})</span>`:''}
+             </div>`;
+    }).join('');
+}
+function toggleCol(key,val) {
+  val ? visibleColKeys.add(key) : visibleColKeys.delete(key);
+  if(detailLoaded) renderDetail();
+}
+
+function getActiveCols() {
+  // respect colOrderArr, filter by visible
+  return colOrderArr
+    .map(k => BASE_COLS.find(c=>c.key===k))
+    .filter(c => c && (c.always || visibleColKeys.has(c.key)));
+}
+
+function renderDetail() {
+  const filterAccId = document.getElementById('clientFilter').value;
+  const list = filterAccId ? accountsData.filter(a=>a.id===filterAccId) : accountsData;
+  const activeCols = getActiveCols();
+
+  // Build draggable header — ALL cols except "Cuenta" are draggable
+  const headRow = document.createElement('tr');
+  // "Cuenta" fixed
+  const thCuenta = document.createElement('th');
+  thCuenta.textContent = 'Cuenta';
+  headRow.appendChild(thCuenta);
+  // All active cols: draggable
+  activeCols.forEach(c => {
+    const th = document.createElement('th');
+    th.textContent = c.label;
+    makeDraggableTh(th, c.key, 'det');
+    headRow.appendChild(th);
+  });
+  // Estado + actions: fixed
+  const thEstado = document.createElement('th');
+  thEstado.textContent = 'Estado';
+  headRow.appendChild(thEstado);
+  headRow.appendChild(document.createElement('th'));
+  document.getElementById('detailHead').innerHTML = '';
+  document.getElementById('detailHead').appendChild(headRow);
+
+  const body = document.getElementById('detailBody');
+  body.innerHTML = '';
+  if (!list.length) {
+    body.innerHTML = `<tr><td colspan="20"><div class="empty"><p>Sin datos. Hacé clic en Actualizar.</p></div></td></tr>`;
+    return;
+  }
+
+  list.forEach(acc => {
+    const s = settings[acc.id]||{};
+    const obj = s.objective||0, bud = s.budget||0;
+    const roas = acc.spend>0 ? totalRevenue(acc)/acc.spend : 0;
+    const budPct = bud>0 ? Math.round(acc.spend/bud*100) : 0;
+    const objPct = obj>0 ? Math.round(totalRevenue(acc)/obj*100) : 0;
+    const sem = semaphore(acc);
+    const cur = s.currency||'ARS';
+    const sym = CURRENCY_SYMBOLS[cur]||'$';
+
+    const tr = document.createElement('tr');
+    tr.className = 'clickable';
+    tr.id = 'row-'+acc.id;
+    tr.onclick = () => toggleDetail(acc.id);
+    tr.innerHTML = `
+      <td style="font-weight:600">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span onclick="startRenameDetail('${acc.id}',event)" title="Clic para editar nombre · Nombre real: ${acc.name}"
+                id="dname-dt-${acc.id}"
+                style="cursor:text;border-bottom:1px dashed var(--border2);padding-bottom:1px">
+            ${displayName(acc.id,acc.name)}
+          </span>
+          <span class="acc-currency-badge">${cur}</span>
+        </div>
+      </td>
+      ${activeCols.map(c => {
+        if(c.key==='objetivo')  return `<td>${obj?sym+fmtN(obj):'<span style="color:var(--text3)">—</span>'}</td>`;
+        if(c.key==='roas')      return `<td style="font-weight:700">×${fmtDec(roas)}</td>`;
+        if(c.key==='objPct')    return `<td>${obj?pbar(objPct,sem.color):'—'}</td>`;
+        if(c.key==='budgetPct'){const bc=budPct>100?'var(--red)':budPct>85?'var(--amber)':'var(--green)';return`<td>${bud?pbar(budPct,bc):'—'}</td>`;}
+        if(c.key==='ctr')       return `<td>${fmtDec(acc.ctr,2)}%</td>`;
+        if(['costPerPurchase','costPerMessage'].includes(c.key)) return `<td>${acc[c.key]>0?sym+fmtDec(acc[c.key],2):'—'}</td>`;
+        if(['spend','revenue'].includes(c.key)) return `<td>${fmtCurrency(acc[c.key],acc.id)}</td>`;
+        return `<td>${fmtN(acc[c.key])}</td>`;
+      }).join('')}
+      <td style="text-align:center;width:48px">
+        <div title="${sem.label}${obj>0?' · Proyectado: '+Math.round(((acc.revenue/obj)/monthProgress)*100)+'%':''}"
+             style="display:inline-flex;flex-direction:column;align-items:center;gap:3px;cursor:default">
+          <svg width="20" height="20" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="9" fill="${sem.bg}" stroke="${sem.color}" stroke-width="1.5"/>
+            <circle cx="10" cy="10" r="5" fill="${sem.color}"/>
+          </svg>
+          <span style="font-size:9px;font-weight:700;color:${sem.tc};white-space:nowrap">${obj>0?Math.round(((acc.revenue/obj)/monthProgress)*100)+'%':''}</span>
+        </div>
+      </td>
+      <td style="color:var(--text3);font-size:12px">▼</td>
+    `;
+    body.appendChild(tr);
+
+    // Detail expansion
+    const trk = s.tracking||'ecommerce';
+    const detRow = document.createElement('tr');
+    detRow.className = 'detail-row';
+    detRow.id = 'det-'+acc.id;
+    const ecom = trk==='ecommerce'||trk==='both';
+    const msg  = trk==='messaging'||trk==='both';
+    detRow.innerHTML = `<td colspan="20"><div class="detail-panel">
+      <div class="detail-grid">
+        <div class="dcard"><div class="dl">Inversión</div><div class="dv">${fmtCurrency(acc.spend,acc.id)}</div></div>
+        <div class="dcard"><div class="dl">Facturado</div><div class="dv">${fmtCurrency(acc.revenue,acc.id)}</div></div>
+        <div class="dcard"><div class="dl">ROAS</div><div class="dv">×${fmtDec(roas)}</div></div>
+        <div class="dcard"><div class="dl">% Objetivo</div><div class="dv" style="color:${sem.color}">${obj?objPct+'%':'—'}</div></div>
+        <div class="dcard"><div class="dl">CTR</div><div class="dv">${fmtDec(acc.ctr,2)}%</div></div>
+        <div class="dcard"><div class="dl">Clics</div><div class="dv">${fmtN(acc.clicks)}</div></div>
+        ${ecom?`
+        <div class="dcard"><div class="dl">Compras</div><div class="dv">${fmtN(acc.purchases)}</div></div>
+        <div class="dcard"><div class="dl">Agreg. carrito</div><div class="dv">${fmtN(acc.addToCart)}</div></div>
+        <div class="dcard"><div class="dl">Pagos iniciados</div><div class="dv">${fmtN(acc.checkouts)}</div></div>
+        <div class="dcard"><div class="dl">Costo x compra</div><div class="dv">${acc.costPerPurchase>0?sym+fmtDec(acc.costPerPurchase,2):'—'}</div></div>`:''}
+        ${msg?`
+        <div class="dcard"><div class="dl">Mensajes</div><div class="dv">${fmtN(acc.messages)}</div></div>
+        <div class="dcard"><div class="dl">Costo x msg</div><div class="dv">${acc.costPerMessage>0?sym+fmtDec(acc.costPerMessage,2):'—'}</div></div>`:''}
+      </div>
+      ${manualRevenue[acc.id]>0 ? `
+      <div style="padding:8px 12px;background:var(--amber-bg);border-radius:var(--radius);margin-bottom:10px;font-size:12px;color:var(--amber-tc)">
+        <strong>Ventas manuales cargadas:</strong> ${sym}${fmtN(Math.round(manualRevenue[acc.id]))}
+        &nbsp;·&nbsp; Total mes: ${sym}${fmtN(Math.round(totalRevenue(acc)))}
+      </div>` : ''}
+      ${!isReadonly?`
+      <div>
+        <div style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:6px">Observaciones</div>
+        <textarea class="obs" id="obs-${acc.id}" placeholder="Anotaciones sobre esta cuenta...">${observations[acc.id]||''}</textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button class="btn btn-sm" onclick="openModal('${acc.id}','${acc.name}',event)">Configurar objetivo</button>
+          <button class="btn btn-sm btn-primary" id="savebtn-${acc.id}" onclick="saveObs('${acc.id}',event)">Guardar observación</button>
+        </div>
+      </div>`:''}
+    </div></td>`;
+    body.appendChild(detRow);
+  });
+}
+
+function toggleDetail(id) {
+  const det = document.getElementById('det-'+id);
+  if (!det) return;
+  det.style.display = det.style.display==='table-row' ? 'none' : 'table-row';
+}
+
+// ══════════════════════════════════════
+// HISTORY
+// ══════════════════════════════════════
+function renderHistoryPage() {
+  // Populate filter if empty
+  const sel = document.getElementById('historyFilterAcc');
+  if (sel.options.length <= 1) {
+    adAccounts.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id; opt.textContent = displayName(a.id, a.name);
+      sel.appendChild(opt);
+    });
+  }
+  const filterAccId = sel.value;
+  const wrap = document.getElementById('historyContent');
+
+  // Build list of accounts to show
+  const accs = filterAccId
+    ? adAccounts.filter(a => a.id === filterAccId)
+    : adAccounts.filter(a => monthlyHistory[a.id] && Object.keys(monthlyHistory[a.id]).length > 0);
+
+  if (!accs.length) {
+    wrap.innerHTML = `<div style="text-align:center;padding:48px;color:var(--text2)">
+      <div style="font-size:32px;margin-bottom:12px">📅</div>
+      <div style="font-weight:600;margin-bottom:6px">Sin historial todavía</div>
+      <div style="font-size:13px">El historial se genera automáticamente al cambiar de mes, o al guardar la configuración de una cuenta.</div>
+    </div>`;
+    return;
+  }
+
+  wrap.innerHTML = accs.map(acc => {
+    const hist = monthlyHistory[acc.id]||{};
+    const months = Object.keys(hist).sort().reverse();
+    if (!months.length) return '';
+    const s = settings[acc.id]||{};
+    const sym = CURRENCY_SYMBOLS[s.currency||'ARS']||'$';
+    const rows = months.map(month => {
+      const h = hist[month];
+      const reached = h.reached;
+      const pct = h.objective>0 ? Math.round((h.revenueTotal||h.revenue||0)/h.objective*100) : null;
+      const roas = h.spend>0 ? ((h.revenueTotal||h.revenue||0)/h.spend).toFixed(2) : '—';
+      const statusColor = reached ? 'var(--green)' : 'var(--red)';
+      const statusBg    = reached ? 'var(--green-bg)' : 'var(--red-bg)';
+      const statusTc    = reached ? 'var(--green-tc)' : 'var(--red-tc)';
+      const [year, m] = month.split('-');
+      const monthName = new Date(year, parseInt(m)-1, 1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+      return `<tr>
+        <td style="font-weight:500;white-space:nowrap">${monthName}</td>
+        <td>${sym}${fmtN(Math.round(h.objective||0))}</td>
+        <td>${sym}${fmtN(Math.round(h.revenue||0))}</td>
+        <td>${h.revenueManual>0 ? sym+fmtN(Math.round(h.revenueManual)) : '—'}</td>
+        <td style="font-weight:700">${sym}${fmtN(Math.round(h.revenueTotal||h.revenue||0))}</td>
+        <td>${pct!==null ? pct+'%' : '—'}</td>
+        <td>×${roas}</td>
+        <td>${sym}${fmtN(Math.round(h.spend||0))}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;background:${statusBg};color:${statusTc}">
+          <span style="width:7px;height:7px;border-radius:50%;background:${statusColor};display:inline-block"></span>
+          ${reached ? 'Alcanzado' : 'No alcanzado'}
+        </span></td>
+      </tr>`;
+    }).join('');
+
+    return `<div style="background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px">${displayName(acc.id, acc.name)}</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead style="background:var(--bg2)">
+            <tr>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border);white-space:nowrap">Mes</th>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border)">Objetivo</th>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border)">Rev. Meta</th>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border)">Rev. Manual</th>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border)">Total</th>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border)">% Obj</th>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border)">ROAS</th>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border)">Inversión</th>
+              <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border)">Estado</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportHistoryExcel() {
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  script.onload = () => {
+    const allRows = [];
+    adAccounts.forEach(acc => {
+      const hist = monthlyHistory[acc.id]||{};
+      const s = settings[acc.id]||{};
+      const sym = CURRENCY_SYMBOLS[s.currency||'ARS']||'$';
+      Object.keys(hist).sort().forEach(month => {
+        const h = hist[month];
+        const [year, m] = month.split('-');
+        const monthName = new Date(year, parseInt(m)-1, 1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+        allRows.push({
+          'Cuenta':         displayName(acc.id, acc.name),
+          'Mes':            monthName,
+          'Objetivo':       h.objective||0,
+          'Revenue Meta':   h.revenue||0,
+          'Revenue Manual': h.revenueManual||0,
+          'Revenue Total':  h.revenueTotal||h.revenue||0,
+          '% Objetivo':     h.objective>0 ? Math.round(((h.revenueTotal||h.revenue||0)/h.objective)*100)+'%' : '—',
+          'ROAS':           h.spend>0 ? ((h.revenueTotal||h.revenue||0)/h.spend).toFixed(2) : '—',
+          'Inversión':      h.spend||0,
+          'Estado':         h.reached ? 'Alcanzado' : 'No alcanzado',
+        });
+      });
+    });
+    if (!allRows.length) { alert('Sin historial para exportar'); return; }
+    const ws = XLSX.utils.json_to_sheet(allRows);
+    ws['!cols'] = Object.keys(allRows[0]).map(k=>({wch: Math.max(k.length, ...allRows.map(r=>(r[k]||'').toString().length))+2}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+    XLSX.writeFile(wb, 'historial-objetivos.xlsx');
+  };
+  if (window.XLSX) { script.onload(); } else { document.head.appendChild(script); }
+}
+
+// ══════════════════════════════════════
+// GROUPS
+// ══════════════════════════════════════
+let editingGroupId = null;
+
+function renderGroupsPage() {
+  const list = document.getElementById('groupsList');
+  if (!list) return;
+  const gEntries = Object.entries(clientGroups);
+  if (!gEntries.length) {
+    list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text2)">
+      <div style="font-size:32px;margin-bottom:12px">🔗</div>
+      <div style="font-weight:600;margin-bottom:6px">Sin grupos todavía</div>
+      <div style="font-size:13px">Creá un grupo para unificar cuentas de un mismo cliente</div>
+    </div>`;
+    return;
+  }
+  list.innerHTML = gEntries.map(([gid, group]) => {
+    const members = (group.accountIds||[]).map(id => {
+      const acc = allAdAccounts.find(a=>a.id===id);
+      return acc ? acc.name : id;
+    });
+    const modeLabel = group.mode === 'unified' ? 'Fila unificada' : 'Filas agrupadas';
+    const modeColor = group.mode === 'unified' ? 'var(--blue)' : 'var(--green)';
+    return `<div style="background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <span style="font-size:15px;font-weight:700">${group.name}</span>
+          <span style="margin-left:8px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:${modeColor}22;color:${modeColor}">${modeLabel}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-xs" onclick="editGroup('${gid}')">Editar</button>
+          <button class="btn btn-xs btn-danger" onclick="deleteGroup('${gid}')">Eliminar</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${members.map(n=>`<span style="font-size:12px;padding:3px 10px;background:var(--bg2);border:0.5px solid var(--border);border-radius:20px">${n}</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openGroupModal(gid) {
+  editingGid = gid || null;
+  document.getElementById('groupModalTitle').textContent = gid ? 'Editar grupo' : 'Nuevo grupo de cliente';
+  const group = gid ? clientGroups[gid] : null;
+  const gs = gid ? (groupSettings['group_'+gid]||{}) : {};
+  document.getElementById('gName').value = group ? group.name : '';
+  document.getElementById('gObjective').value = gs.objective||'';
+  document.getElementById('gBudget').value = gs.budget||'';
+  document.getElementById('gCurrency').value = gs.currency||'ARS';
+  const mode = group ? group.mode : 'unified';
+  document.querySelector(`input[name="gMode"][value="${mode}"]`).checked = true;
+  updateModeUI();
+  // Build account checklist
+  const accList = document.getElementById('gAccList');
+  accList.innerHTML = allAdAccounts.map(acc => {
+    const checked = group && (group.accountIds||[]).includes(acc.id);
+    return `<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px">
+      <input type="checkbox" value="${acc.id}" ${checked?'checked':''} style="accent-color:var(--blue);width:15px;height:15px">
+      ${acc.name}
+    </label>`;
+  }).join('');
+  document.getElementById('groupModalOverlay').classList.add('open');
+}
+function closeGroupModal(e) {
+  if (!e || e.target.id==='groupModalOverlay') document.getElementById('groupModalOverlay').classList.remove('open');
+}
+function updateModeUI() {
+  const mode = document.querySelector('input[name="gMode"]:checked').value;
+  document.getElementById('modeUnifiedLabel').style.borderColor = mode==='unified' ? 'var(--blue)' : 'var(--border2)';
+  document.getElementById('modeGroupedLabel').style.borderColor = mode==='grouped' ? 'var(--blue)' : 'var(--border2)';
+}
+function saveGroup() {
+  const name = document.getElementById('gName').value.trim();
+  if (!name) { alert('Ingresá un nombre para el grupo'); return; }
+  const mode = document.querySelector('input[name="gMode"]:checked').value;
+  const accountIds = [...document.querySelectorAll('#gAccList input:checked')].map(cb=>cb.value);
+  if (accountIds.length < 2) { alert('Seleccioná al menos 2 cuentas para formar un grupo'); return; }
+  const gid = editingGid || ('g_' + Date.now());
+  clientGroups[gid] = { name, mode, accountIds };
+  saveGroups();
+  // Save group-level objective/budget/currency
+  groupSettings['group_'+gid] = {
+    objective: parseFloat(document.getElementById('gObjective').value)||0,
+    budget:    parseFloat(document.getElementById('gBudget').value)||0,
+    currency:  document.getElementById('gCurrency').value||'ARS',
+  };
+  saveGroupSettings();
+  closeGroupModal();
+  renderGroupsPage();
+  renderOverview();
+  if (detailLoaded) renderDetail();
+}
+function editGroup(gid) { openGroupModal(gid); }
+function deleteGroup(gid) {
+  if (!confirm('¿Eliminar este grupo? Las cuentas volverán a verse individualmente.')) return;
+  delete clientGroups[gid];
+  saveGroups();
+  renderGroupsPage();
+  renderOverview();
+  if (detailLoaded) renderDetail();
+}
+
+// ══════════════════════════════════════
+// INLINE RENAME
+// ══════════════════════════════════════
+function startRenameOverview(id, e) {
+  e.stopPropagation();
+  const span = document.getElementById('dname-ov-'+id);
+  if (!span) return;
+  const cur = span.textContent.trim();
+  const acc = accountsData.find(a=>a.id===id);
+  const real = acc ? acc.name : cur;
+  span.innerHTML = `<input id="inp-ov-${id}" value="${cur}"
+    style="font:inherit;border:none;border-bottom:2px solid var(--blue);outline:none;background:transparent;width:140px;padding:0"
+    onblur="commitRename('${id}','ov')" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${cur}';this.blur();}">`;
+  const inp = document.getElementById('inp-ov-'+id);
+  if (inp) { inp.focus(); inp.select(); }
+}
+function startRenameDetail(id, e) {
+  e.stopPropagation();
+  const span = document.getElementById('dname-dt-'+id);
+  if (!span) return;
+  const cur = span.textContent.trim();
+  const acc = accountsData.find(a=>a.id===id);
+  const real = acc ? acc.name : cur;
+  span.innerHTML = `<input id="inp-dt-${id}" value="${cur}"
+    style="font:inherit;border:none;border-bottom:2px solid var(--blue);outline:none;background:transparent;width:140px;padding:0"
+    onblur="commitRename('${id}','dt')" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${cur}';this.blur();}">`;
+  const inp = document.getElementById('inp-dt-'+id);
+  if (inp) { inp.focus(); inp.select(); }
+}
+function commitRename(id, prefix) {
+  const inp = document.getElementById('inp-'+prefix+'-'+id);
+  if (!inp) return;
+  const val = inp.value.trim();
+  saveCustomName(id, val);
+  const acc = accountsData.find(a=>a.id===id);
+  const real = acc ? acc.name : '';
+  const shown = displayName(id, real);
+  const span = document.getElementById('dname-'+prefix+'-'+id);
+  if (span) span.innerHTML = shown;
+  // also refresh chart labels
+  renderChart();
+}
+
+// ══════════════════════════════════════
+// DRAG & DROP — tag pills in col-cfg panels
+// ══════════════════════════════════════
+function onTagDragStart(e) {
+  dragTagKey   = e.currentTarget.dataset.key;
+  dragTagTable = e.currentTarget.dataset.table;
+  e.currentTarget.style.opacity = '.4';
+}
+function onTagDragOver(e) { e.preventDefault(); }
+function onTagDragEnd(e)  { e.currentTarget.style.opacity = '1'; }
+function onTagDrop(e, table) {
+  e.preventDefault();
+  if (table !== dragTagTable) return;
+  const targetKey = e.currentTarget.dataset.key;
+  if (!targetKey || targetKey === dragTagKey) return;
+  if (table === 'ov') {
+    const arr = [...ovColOrder];
+    const si = arr.indexOf(dragTagKey), ti = arr.indexOf(targetKey);
+    if (si<0||ti<0) return;
+    arr.splice(si,1); arr.splice(ti,0,dragTagKey);
+    ovColOrder = arr;
+    localStorage.setItem('cr_ovcolorder', JSON.stringify(ovColOrder));
+    renderOverview();
+  } else {
+    const arr = [...colOrderArr];
+    const si = arr.indexOf(dragTagKey), ti = arr.indexOf(targetKey);
+    if (si<0||ti<0) return;
+    arr.splice(si,1); arr.splice(ti,0,dragTagKey);
+    colOrderArr = arr;
+    localStorage.setItem('cr_colorder', JSON.stringify(colOrderArr));
+    renderDetail();
+  }
+}
+// ── TABLE HEADER DRAG (overview + detail) ──
+
+function onColDragStart(e) {
+  dragColKey   = e.currentTarget.dataset.key;
+  dragColTable = e.currentTarget.dataset.table;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onColDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('th.drag-over').forEach(t=>t.classList.remove('drag-over'));
+  e.currentTarget.classList.add('drag-over');
+}
+function onColDragEnd(e) {
+  document.querySelectorAll('th').forEach(t=>t.classList.remove('dragging','drag-over'));
+}
+function onColDrop(e) {
+  e.preventDefault();
+  const targetKey = e.currentTarget.dataset.key;
+  if (!targetKey || !dragColKey || targetKey === dragColKey) return;
+  if (dragColTable === 'ov') {
+    const arr = [...ovColOrder];
+    const si = arr.indexOf(dragColKey), ti = arr.indexOf(targetKey);
+    if (si<0||ti<0) return;
+    arr.splice(si,1); arr.splice(ti,0,dragColKey);
+    ovColOrder = arr;
+    localStorage.setItem('cr_ovcolorder', JSON.stringify(ovColOrder));
+    renderOverview();
+  } else {
+    const arr = [...colOrderArr];
+    const si = arr.indexOf(dragColKey), ti = arr.indexOf(targetKey);
+    if (si<0||ti<0) return;
+    arr.splice(si,1); arr.splice(ti,0,dragColKey);
+    colOrderArr = arr;
+    localStorage.setItem('cr_colorder', JSON.stringify(colOrderArr));
+    renderDetail();
+  }
+  document.querySelectorAll('th').forEach(t=>t.classList.remove('dragging','drag-over'));
+}
+
+function makeDraggableTh(th, key, table) {
+  th.draggable = true;
+  th.dataset.key = key;
+  th.dataset.table = table;
+  th.style.cursor = 'grab';
+  th.title = 'Arrastrá para reordenar';
+  th.addEventListener('dragstart', onColDragStart);
+  th.addEventListener('dragover',  onColDragOver);
+  th.addEventListener('drop',      onColDrop);
+  th.addEventListener('dragend',   onColDragEnd);
+}
+
+// ══════════════════════════════════════
+// ACCOUNTS MANAGER PAGE
+// ══════════════════════════════════════
+function renderAccountsPage() {
+  const list = document.getElementById('accList');
+  const statusColor = { 1:'var(--green)', 2:'var(--red)', 3:'var(--amber)', 7:'var(--gray)', 8:'var(--red)', 9:'var(--red)' };
+  list.innerHTML = allAdAccounts.map(acc => {
+    const s = settings[acc.id]||{};
+    const hidden = hiddenAccs.includes(acc.id);
+    const st = acc.account_status;
+    const stLabel = ACC_STATUS_LABELS[st] || ('Status '+st);
+    const stColor = statusColor[st] || 'var(--gray)';
+    return `<div class="acc-item">
+      <label>
+        <input type="checkbox" id="vis-${acc.id}" ${hidden?'':'checked'}>
+        ${acc.name}
+      </label>
+      <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:${stColor}22;color:${stColor};white-space:nowrap">${stLabel}</span>
+      <span class="acc-currency-badge">${s.currency||acc.currency||'ARS'}</span>
+      <button class="btn btn-xs" onclick="openModal('${acc.id}','${acc.name}',event)">Config</button>
+    </div>`;
+  }).join('') || '<p style="font-size:13px;color:var(--text2);text-align:center;padding:1rem">No se encontraron cuentas</p>';
+}
+function toggleAllAccounts(val) {
+  document.querySelectorAll('#accList input[type=checkbox]').forEach(cb => cb.checked=val);
+}
+function saveAccountVisibility() {
+  const newHidden = [];
+  allAdAccounts.forEach(acc => {
+    const cb = document.getElementById('vis-'+acc.id);
+    if (cb && !cb.checked) newHidden.push(acc.id);
+  });
+  hiddenAccs = newHidden;
+  localStorage.setItem('cr_hidden', JSON.stringify(hiddenAccs));
+  applyAccountVisibility();
+  // rebuild client filter
+  const sel = document.getElementById('clientFilter');
+  sel.innerHTML = '<option value="">Todas las cuentas</option>';
+  adAccounts.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.name}</option>`);
+  loadOverview().then(()=>{ renderOverview(); alert('Cambios guardados. Actualizando datos...'); });
+}
+function hideAccount(id, e) {
+  if(e) e.stopPropagation();
+  if(!confirm('¿Ocultar esta cuenta del dashboard?')) return;
+  if(!hiddenAccs.includes(id)) hiddenAccs.push(id);
+  localStorage.setItem('cr_hidden', JSON.stringify(hiddenAccs));
+  applyAccountVisibility();
+  accountsData = accountsData.filter(a=>a.id!==id);
+  renderOverview();
+  renderAccountsPage();
+}
+
+// ══════════════════════════════════════
+// MODAL
+// ══════════════════════════════════════
+function openModal(id, name, e) {
+  if(isReadonly) return;
+  if(e) e.stopPropagation();
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'Configurar: '+name;
+  const s = settings[id]||{};
+  document.getElementById('mObjective').value = s.objective||'';
+  document.getElementById('mBudget').value    = s.budget||'';
+  document.getElementById('mCurrency').value  = s.currency||'ARS';
+  document.getElementById('mTracking').value  = s.tracking||'ecommerce';
+  const manRev = manualRevenue[id]||0;
+  document.getElementById('mManualRevenue').value = manRev||'';
+  updateManualRevenueUI(id);
+  document.getElementById('mTracking').onchange = () => updateManualRevenueUI(id);
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(e) { if(e.target.id==='modalOverlay') closeModalDirect(); }
+function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('open'); }
+function updateManualRevenueUI(id) {
+  const trk = document.getElementById('mTracking').value;
+  const block = document.getElementById('mManualBlock');
+  const showManual = trk === 'messaging' || trk === 'both';
+  block.style.display = showManual ? 'block' : 'none';
+  if (showManual) {
+    const s = settings[id]||{};
+    const sym = CURRENCY_SYMBOLS[s.currency||'ARS']||'$';
+    const manRev = parseFloat(document.getElementById('mManualRevenue').value)||0;
+    const acc = accountsData.find(a=>a.id===id);
+    const metaRev = acc ? (acc.revenue||0) : 0;
+    const total = metaRev + manRev;
+    const obj = parseFloat(document.getElementById('mObjective').value)||0;
+    document.getElementById('mManualPreview').innerHTML = obj>0
+      ? `Meta: ${sym}${fmtN(Math.round(metaRev))} + Manual: ${sym}${fmtN(Math.round(manRev))} = <strong>${sym}${fmtN(Math.round(total))}</strong> (${Math.round(total/obj*100)}% del objetivo)`
+      : `Meta: ${sym}${fmtN(Math.round(metaRev))} + Manual: ${sym}${fmtN(Math.round(manRev))} = ${sym}${fmtN(Math.round(total))}`;
+    document.getElementById('mManualRevenue').oninput = () => updateManualRevenueUI(id);
+  }
+}
+function saveModal() {
+  if(!editingId) return;
+  settings[editingId] = {
+    objective: parseFloat(document.getElementById('mObjective').value)||0,
+    budget:    parseFloat(document.getElementById('mBudget').value)||0,
+    currency:  document.getElementById('mCurrency').value,
+    tracking:  document.getElementById('mTracking').value,
+  };
+  localStorage.setItem('cr_settings', JSON.stringify(settings));
+  // Save manual revenue
+  const manRev = parseFloat(document.getElementById('mManualRevenue').value)||0;
+  if (manRev > 0) manualRevenue[editingId] = manRev;
+  else delete manualRevenue[editingId];
+  saveManualRevenue();
+  // Archive current month snapshot
+  const acc = accountsData.find(a=>a.id===editingId);
+  if (acc) archiveMonthResult(editingId, acc.revenue||0, acc.spend||0);
+  closeModalDirect();
+  renderOverview();
+  if(detailLoaded) renderDetail();
+  renderAccountsPage();
+}
+function saveObs(id, e) {
+  if(e) e.stopPropagation();
+  observations[id] = document.getElementById('obs-'+id).value;
+  localStorage.setItem('cr_obs', JSON.stringify(observations));
+  const btn = document.getElementById('savebtn-'+id);
+  if(btn){ btn.textContent='✓ Guardado'; setTimeout(()=>btn.textContent='Guardar observación',2000); }
+}
+
+// ══════════════════════════════════════
+// SHARE MODAL
+// ══════════════════════════════════════
+function openShareModal() {
+  document.getElementById('shareLinkResult').style.display='none';
+  document.getElementById('sharePin').value='';
+  document.getElementById('shareModalOverlay').classList.add('open');
+}
+function closeShareModal(e) {
+  if(!e || e.target.id==='shareModalOverlay') document.getElementById('shareModalOverlay').classList.remove('open');
+}
+function generateShareLink() {
+  const pin = document.getElementById('sharePin').value.trim();
+  if(!pin||pin.length<4){ alert('El PIN debe tener al menos 4 dígitos'); return; }
+  localStorage.setItem('cr_sharepin', pin);
+  const url = location.origin + location.pathname + '?view=1';
+  document.getElementById('shareLinkUrl').textContent = url;
+  document.getElementById('sharePinDisplay').textContent = pin;
+  document.getElementById('shareLinkResult').style.display='block';
+}
+function copyShareLink() {
+  const url = document.getElementById('shareLinkUrl').textContent;
+  navigator.clipboard.writeText(url).then(()=>alert('Link copiado al portapapeles')).catch(()=>alert('Link: '+url));
+}
+
+// ══════════════════════════════════════
+// NAV
+// ══════════════════════════════════════
+function switchPage(name) {
+  currentPage = name;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  const navEl = document.getElementById('nav-'+name);
+  if(navEl) navEl.classList.add('active');
+  if(name==='detail' && !detailLoaded) loadDetail();
+}
+function onDateChange0() {
+  const v = document.getElementById('dateRange0').value;
+  document.getElementById('customDates0').style.display = v==='custom'?'flex':'none';
+  if(v!=='custom') { loadOverview().then(()=>renderOverview()); }
+}
+function applyPreset() {
+  const v = document.getElementById('datePreset').value;
+  document.getElementById('customDates1').style.display = v==='custom'?'flex':'none';
+  if(v!=='custom') loadDetail();
+}
+function exportReport(format) {
+  // Gather active cols and current data
+  const activeCols = getActiveCols();
+  const filterAccId = document.getElementById('clientFilter').value;
+  const list = filterAccId ? accountsData.filter(a=>a.id===filterAccId) : accountsData;
+  const dateLabel = document.getElementById('datePreset').value === 'custom'
+    ? (document.getElementById('dateFrom1').value + ' → ' + document.getElementById('dateTo1').value)
+    : document.getElementById('datePreset').options[document.getElementById('datePreset').selectedIndex].text;
+
+  // Build rows data
+  const rows = list.map(acc => {
+    const s = settings[acc.id]||{};
+    const obj = s.objective||0, bud = s.budget||0;
+    const roas = acc.spend>0 ? acc.revenue/acc.spend : 0;
+    const budPct = bud>0 ? Math.round(acc.spend/bud*100) : 0;
+    const objPct = obj>0 ? Math.round(acc.revenue/obj*100) : 0;
+    const sem = semaphore(acc);
+    const cur = s.currency||'ARS';
+    const sym = CURRENCY_SYMBOLS[cur]||'$';
+    const obs = observations[acc.id]||'';
+    const projected = obj>0 ? Math.round(((acc.revenue/obj)/monthProgress)*100) : null;
+    const row = { nombre: displayName(acc.id,acc.name), estado: sem.label };
+    if(projected!==null) row.proyectado = projected+'%';
+    activeCols.forEach(c => {
+      if(c.key==='objetivo')        row[c.label] = obj ? sym+fmtN(obj) : '—';
+      else if(c.key==='roas')       row[c.label] = '×'+fmtDec(roas);
+      else if(c.key==='objPct')     row[c.label] = obj ? objPct+'%' : '—';
+      else if(c.key==='budgetPct')  row[c.label] = bud ? budPct+'%' : '—';
+      else if(c.key==='ctr')        row[c.label] = fmtDec(acc.ctr,2)+'%';
+      else if(['costPerPurchase','costPerMessage'].includes(c.key)) row[c.label] = acc[c.key]>0 ? sym+fmtDec(acc[c.key],2) : '—';
+      else if(['spend','revenue'].includes(c.key)) row[c.label] = sym+fmtN(Math.round(acc[c.key]||0));
+      else row[c.label] = fmtN(acc[c.key]);
+    });
+    row.observaciones = obs;
+    return row;
+  });
+
+  if (format === 'excel') {
+    exportExcel(rows, dateLabel);
+  } else {
+    exportPDFReport(rows, activeCols, dateLabel, list);
+  }
+}
+
+function exportExcel(rows, dateLabel) {
+  // Use SheetJS via CDN
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  script.onload = () => {
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Auto column widths
+    const colWidths = Object.keys(rows[0]||{}).map(k => ({
+      wch: Math.max(k.length, ...rows.map(r=>(r[k]||'').toString().length)) + 2
+    }));
+    ws['!cols'] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Informe');
+    const today = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `informe-meta-ads-${today}.xlsx`);
+  };
+  if (window.XLSX) {
+    script.onload();
+  } else {
+    document.head.appendChild(script);
+  }
+}
+
+function exportPDFReport(rows, activeCols, dateLabel, list) {
+  const today = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'});
+  const headers = ['Cliente', 'Estado', 'Proyectado', ...activeCols.map(c=>c.label), 'Observaciones'];
+
+  const tableRows = rows.map((row, i) => {
+    const acc = list[i];
+    const s = settings[acc.id]||{};
+    const obj = s.objective||0;
+    const sem = semaphore(acc);
+    const projected = obj>0 ? Math.round(((acc.revenue/obj)/monthProgress)*100) : null;
+    const cells = [
+      `<td><strong>${row.nombre}</strong></td>`,
+      `<td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${sem.color};margin-right:5px"></span>${sem.label}</td>`,
+      `<td>${projected!==null ? projected+'%' : '—'}</td>`,
+      ...activeCols.map(c => `<td>${row[c.label]||'—'}</td>`),
+      `<td style="font-size:11px;color:#555;max-width:200px">${row.observaciones||''}</td>`,
+    ];
+    return `<tr style="background:${i%2===0?'#fff':'#f9f9f9'}">${cells.join('')}</tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head>
+    <meta charset="UTF-8">
+    <title>Informe Meta Ads — ${today}</title>
+    <style>
+      body { font-family: -apple-system, sans-serif; font-size: 12px; color: #1a1a18; margin: 0; padding: 24px; }
+      h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+      .sub { font-size: 12px; color: #6b6b67; margin-bottom: 20px; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      th { text-align: left; padding: 8px 10px; font-size: 10px; font-weight: 700;
+           text-transform: uppercase; letter-spacing: .04em; color: #6b6b67;
+           border-bottom: 2px solid #e0e0e0; background: #f5f5f3; white-space: nowrap; }
+      td { padding: 8px 10px; border-bottom: 0.5px solid #e8e8e8; vertical-align: top; }
+      @media print {
+        @page { margin: 15mm 12mm; size: A4 landscape; }
+        body { padding: 0; }
+        .no-print { display: none; }
+      }
+    </style>
+  </head><body>
+    <h1>Informe semanal — Meta Ads</h1>
+    <div class="sub">Período: ${dateLabel} &nbsp;·&nbsp; Generado: ${today} &nbsp;·&nbsp; ${list.length} cuentas</div>
+    <button class="no-print" onclick="window.print()" style="margin-bottom:16px;padding:8px 16px;background:#1877F2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">⎙ Imprimir / Guardar PDF</button>
+    <table>
+      <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
+function logout() {
+  if(typeof FB!=='undefined') FB.logout(()=>{});
+  accessToken='';
+  localStorage.removeItem('cr_appid');
+  localStorage.removeItem('cr_lastdata');
+  location.reload();
+}
+
+// ══════════════════════════════════════
+// INIT
+// ══════════════════════════════════════
+function showLoginLoading(msg) {
+  const ov = document.getElementById('loginLoadingOverlay');
+  if (ov) { ov.style.display = 'flex'; }
+  updateLoginLoadingMsg(msg||'Reconectando con Meta...');
+}
+function hideLoginLoading() {
+  const ov = document.getElementById('loginLoadingOverlay');
+  if (ov) ov.style.display = 'none';
+}
+function updateLoginLoadingMsg(msg) {
+  const el = document.getElementById('loginLoadingMsg');
+  if (el) el.textContent = msg;
+}
+function cancelAutoLogin() {
+  hideLoginLoading();
+  window._pendingAppId = null;
+}
+
+if (!checkReadonly()) {
+  const savedAppId = localStorage.getItem('cr_appid');
+  if (savedAppId) {
+    showLoginLoading('Reconectando con Meta...');
+    window._pendingAppId = savedAppId;
+  }
+}
+
+window.fbAsyncInit = function() {
+  if (window._pendingAppId) {
+    tryAutoLogin(window._pendingAppId);
+  }
+};
+</script>
+<script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+</body>
+</html>
