@@ -476,8 +476,8 @@ tr:hover .row-actions{opacity:1}
     </select>
 
     <div class="modal-btns">
-      <button class="btn" onclick="closeModalDirect()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveModal()">Guardar</button>
+      <button class="btn" id="modalCancelBtn">Cancelar</button>
+      <button class="btn btn-primary" id="modalSaveBtn">Guardar</button>
     </div>
   </div>
 </div>
@@ -656,6 +656,9 @@ let dragTagKey    = null, dragTagTable = null;
 let dragColKey    = null, dragColTable = null;
 
 // Auto-archive: on load, check if last saved month != current month and archive if needed
+function saveHistory()       { localStorage.setItem('cr_history', JSON.stringify(monthlyHistory)); }
+function saveManualRevenue() { localStorage.setItem('cr_manual',  JSON.stringify(manualRevenue)); }
+
 function checkMonthRollover() {
   const lastMonth = localStorage.getItem('cr_lastmonth');
   if (lastMonth && lastMonth !== currentMonthKey) {
@@ -995,9 +998,9 @@ function showAlertSafe(msg) {
 
 function applyAccountVisibility() {
   adAccounts = allAdAccounts.filter(a => !hiddenAccs.includes(a.id));
-  // Safety: if ALL accounts are hidden, reset hiddenAccs (probably a stale list from old account IDs)
-  if (adAccounts.length === 0 && allAdAccounts.length > 0) {
-    console.warn('[MetaDash] All accounts hidden — resetting hiddenAccs');
+  // Safety: if more than 80% of accounts are hidden, the list is probably stale — reset it
+  if (allAdAccounts.length > 0 && adAccounts.length < allAdAccounts.length * 0.2) {
+    console.warn('[MetaDash] Most accounts hidden — resetting hiddenAccs to show all');
     hiddenAccs = [];
     localStorage.setItem('cr_hidden', '[]');
     adAccounts = [...allAdAccounts];
@@ -1322,8 +1325,13 @@ function renderChart() {
 
   // Now fix dynamic widths using JS
   const svg = document.getElementById('hbarSvg');
-  const totalW = svg.getBoundingClientRect().width || 600;
-  const trackW = totalW - LABEL_W - 64 - 8;  // 64 = ROAS chip width only
+  // getBoundingClientRect can return 0 if not yet visible — use parentElement width or fallback
+  let totalW = svg.getBoundingClientRect().width;
+  if (!totalW || totalW < 100) {
+    totalW = (svg.parentElement && svg.parentElement.getBoundingClientRect().width) || 
+             (wrap.getBoundingClientRect().width) || 700;
+  }
+  const trackW = Math.max(totalW - LABEL_W - 64 - 8, 100);
   const markerX = LABEL_W + trackW;
   const rightX  = LABEL_W + trackW + 10;
   const roasX   = LABEL_W + trackW + 76;
@@ -2437,6 +2445,14 @@ window.fbAsyncInit = function() {
     tryAutoLogin(window._pendingAppId);
   }
 };
+
+// Attach modal button listeners after DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+  const saveBtn   = document.getElementById('modalSaveBtn');
+  const cancelBtn = document.getElementById('modalCancelBtn');
+  if (saveBtn)   saveBtn.addEventListener('click',   function(e){ e.stopPropagation(); saveModal(); });
+  if (cancelBtn) cancelBtn.addEventListener('click', function(e){ e.stopPropagation(); closeModalDirect(); });
+});
 </script>
 <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
 </body>
