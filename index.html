@@ -998,14 +998,15 @@ function showAlertSafe(msg) {
 
 function applyAccountVisibility() {
   adAccounts = allAdAccounts.filter(a => !hiddenAccs.includes(a.id));
-  // Safety: if more than 80% of accounts are hidden, the list is probably stale — reset it
-  if (allAdAccounts.length > 0 && adAccounts.length < allAdAccounts.length * 0.2) {
-    console.warn('[MetaDash] Most accounts hidden — resetting hiddenAccs to show all');
-    hiddenAccs = [];
-    localStorage.setItem('cr_hidden', '[]');
-    adAccounts = [...allAdAccounts];
+  // If hiddenAccs contains IDs that don't exist in allAdAccounts (stale), clean them up silently
+  const validIds = new Set(allAdAccounts.map(a => a.id));
+  const cleanHidden = hiddenAccs.filter(id => validIds.has(id));
+  if (cleanHidden.length !== hiddenAccs.length) {
+    hiddenAccs = cleanHidden;
+    localStorage.setItem('cr_hidden', JSON.stringify(hiddenAccs));
+    adAccounts = allAdAccounts.filter(a => !hiddenAccs.includes(a.id));
   }
-  console.log('[MetaDash] applyAccountVisibility: allAdAccounts=', allAdAccounts.length, '→ adAccounts=', adAccounts.length);
+  console.log('[MetaDash] adAccounts=', adAccounts.length, '/ allAdAccounts=', allAdAccounts.length);
 }
 
 function launchApp(readonly) {
@@ -1986,7 +1987,13 @@ function saveAccountVisibility() {
   const sel = document.getElementById('clientFilter');
   sel.innerHTML = '<option value="">Todas las cuentas</option>';
   adAccounts.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.name}</option>`);
-  loadOverview().then(()=>{ renderOverview(); alert('Cambios guardados. Actualizando datos...'); });
+  loadOverview().then(()=>{
+    renderOverview();
+    if (detailLoaded) loadDetail();
+    // Show brief confirmation without blocking alert
+    const btn = document.querySelector('#page-accounts .btn-primary');
+    if (btn) { const orig = btn.textContent; btn.textContent = '✓ Guardado'; setTimeout(()=>btn.textContent=orig, 2000); }
+  });
 }
 function hideAccount(id, e) {
   if(e) e.stopPropagation();
@@ -1996,6 +2003,8 @@ function hideAccount(id, e) {
   applyAccountVisibility();
   accountsData = accountsData.filter(a=>a.id!==id);
   renderOverview();
+  renderChart();
+  if (detailLoaded) renderDetail();
   renderAccountsPage();
 }
 
