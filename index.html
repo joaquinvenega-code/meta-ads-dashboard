@@ -2012,6 +2012,7 @@ function closeModalDirect() { document.getElementById('modalOverlay').classList.
 
 function saveModal() {
   if(!editingId) return;
+  // Save settings first
   settings[editingId] = {
     objective: parseFloat(document.getElementById('mObjective').value)||0,
     budget:    parseFloat(document.getElementById('mBudget').value)||0,
@@ -2019,13 +2020,17 @@ function saveModal() {
     tracking:  document.getElementById('mTracking').value,
   };
   localStorage.setItem('cr_settings', JSON.stringify(settings));
-  // Archive current month snapshot
-  const acc = accountsData.find(a=>a.id===editingId);
-  if (acc) archiveMonthResult(editingId, acc.revenue||0, acc.spend||0);
+  // Archive snapshot if we have data
+  try {
+    const acc = accountsData.find(a=>a.id===editingId);
+    if (acc) archiveMonthResult(editingId, acc.revenue||0, acc.spend||0);
+  } catch(e) { console.warn('[MetaDash] archiveMonthResult failed:', e); }
+  // ALWAYS close the modal first
   closeModalDirect();
-  renderOverview();
-  if(detailLoaded) renderDetail();
-  renderAccountsPage();
+  // Then re-render — wrapped so an error here doesn't affect the close
+  try { renderOverview(); } catch(e) { console.warn('[MetaDash] renderOverview failed:', e); }
+  try { if(detailLoaded) renderDetail(); } catch(e) { console.warn('[MetaDash] renderDetail failed:', e); }
+  try { renderAccountsPage(); } catch(e) { console.warn('[MetaDash] renderAccountsPage failed:', e); }
 }
 function saveObs(id, e) {
   if(e) e.stopPropagation();
