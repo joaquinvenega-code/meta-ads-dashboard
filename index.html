@@ -1267,16 +1267,16 @@ function renderChart() {
   const trackBg = isDark ? '#2e2e2b' : '#e8e8e8';
 
   wrap.innerHTML = `
-    <div style="display:grid;grid-template-columns:160px 1fr 56px;gap:0;font-family:-apple-system,sans-serif">
+    <div style="display:grid;grid-template-columns:160px 1fr 72px 56px;gap:0;font-family:-apple-system,sans-serif">
       <!-- Headers -->
       <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px 20px">Cliente</div>
-      <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px 4px">Progreso del objetivo</div>
-      <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px 4px">ROAS</div>
+      <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px;text-align:center">Progreso del objetivo</div>
+      <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px;text-align:center">Facturado</div>
+      <div style="font-size:10px;font-weight:700;color:${textSecondary};text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px;text-align:center">ROAS</div>
       ${chartItems.map(d => {
         const fillPct  = Math.min(d.pct, 1) * 100;
         const rc       = roasColor(d.roas);
         const revShort = fmtShort(d.sym, d.rev);
-        const showInside = d.obj > 0 && d.pct > 0.22;
         const objPct   = d.obj > 0 ? Math.round(d.pct*100) : null;
 
         return `
@@ -1285,18 +1285,21 @@ function renderChart() {
             <span style="width:8px;height:8px;border-radius:50%;background:${d.sem.color};flex-shrink:0"></span>
             <span style="font-size:12px;font-weight:500;color:${textPrimary};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.label}">${d.label.length>20?d.label.slice(0,19)+'…':d.label}</span>
           </div>
-          <!-- bar cell: revenue left of bar, pct inside bar -->
-          <div style="display:flex;align-items:center;gap:6px;padding:4px">
-            <span style="font-size:10px;font-weight:600;color:${textPrimary};white-space:nowrap;min-width:52px;text-align:right">${revShort}</span>
-            <div style="flex:1;height:18px;background:${trackBg};border-radius:4px;position:relative;overflow:hidden">
-              <div style="position:absolute;left:0;top:0;height:100%;width:${fillPct.toFixed(1)}%;background:${d.sem.color};opacity:.85;border-radius:4px;transition:width .3s"></div>
-              ${objPct!==null && d.pct > 0.12 ? `<span style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:rgba(255,255,255,.95)">${objPct}%</span>` : ''}
-              ${objPct!==null && d.pct <= 0.12 ? `<span style="position:absolute;left:calc(${fillPct.toFixed(1)}% + 4px);top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:${d.sem.color}">${objPct}%</span>` : ''}
-              ${d.obj > 0 ? `<div style="position:absolute;right:0;top:-2px;height:calc(100% + 4px);width:1.5px;background:rgba(128,128,128,.35);"></div>` : ''}
+          <!-- bar cell: pct inside bar -->
+          <div style="display:flex;align-items:center;padding:4px">
+            <div style="flex:1;height:18px;background:${trackBg};border-radius:4px;position:relative;overflow:visible">
+              <div style="position:absolute;left:0;top:0;height:100%;width:${fillPct.toFixed(1)}%;background:${d.sem.color};opacity:.85;border-radius:4px;transition:width .3s;overflow:hidden"></div>
+              ${objPct!==null && d.pct > 0.12 ? `<span style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:rgba(255,255,255,.95);z-index:1">${objPct}%</span>` : ''}
+              ${objPct!==null && d.pct <= 0.12 ? `<span style="position:absolute;left:calc(${fillPct.toFixed(1)}% + 4px);top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:${d.sem.color};z-index:1">${objPct}%</span>` : ''}
+              ${d.obj > 0 ? `<div style="position:absolute;right:0;top:-2px;height:calc(100% + 4px);width:1.5px;background:rgba(128,128,128,.35);border-radius:1px"></div>` : ''}
             </div>
           </div>
+          <!-- facturado cell -->
+          <div style="display:flex;align-items:center;justify-content:center;padding:4px">
+            <span style="font-size:11px;font-weight:700;color:${textPrimary};white-space:nowrap">${revShort}</span>
+          </div>
           <!-- roas cell -->
-          <div style="display:flex;align-items:center;padding:4px 4px 4px 4px">
+          <div style="display:flex;align-items:center;justify-content:center;padding:4px">
             <span style="font-size:11px;font-weight:700;color:${rc};padding:2px 6px;background:${rc}22;border-radius:4px">×${d.roas.toFixed(1)}</span>
           </div>`;
       }).join('')}
