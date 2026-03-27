@@ -2393,7 +2393,9 @@ function exportPDFReport(rows, activeCols, dateLabel, list) {
     <meta charset="UTF-8">
     <title>Informe Meta Ads — ${today}</title>
     <style>
-      body { font-family: -apple-system, sans-serif; font-size: 12px; color: #1a1a18; margin: 0 auto; padding: 32px 40px; max-width: 960px; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, sans-serif; font-size: 12px; color: #1a1a18; background: #fff; }
+      .wrap { padding: 32px 48px; }
       h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
       .sub { font-size: 12px; color: #6b6b67; margin-bottom: 20px; }
       table { width: 100%; border-collapse: collapse; font-size: 11px; }
@@ -2402,12 +2404,12 @@ function exportPDFReport(rows, activeCols, dateLabel, list) {
            border-bottom: 2px solid #e0e0e0; background: #f5f5f3; white-space: nowrap; }
       td { padding: 8px 10px; border-bottom: 0.5px solid #e8e8e8; vertical-align: top; }
       @media print {
-        @page { margin: 25mm 30mm; size: A4 landscape; }
-        body { padding: 0; }
-        .no-print { display: none; }
+        @page { margin: 20mm 20mm; size: A4 landscape; }
+        .no-print { display: none !important; }
       }
     </style>
   </head><body>
+  <div class="wrap">
     <h1>Informe semanal — Meta Ads</h1>
     <div class="sub">Período: ${dateLabel} &nbsp;·&nbsp; Generado: ${today} &nbsp;·&nbsp; ${list.length} cuentas</div>
     <button class="no-print" onclick="window.print()" style="margin-bottom:16px;padding:8px 16px;background:#1877F2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">⎙ Imprimir / Guardar PDF</button>
@@ -2415,6 +2417,7 @@ function exportPDFReport(rows, activeCols, dateLabel, list) {
       <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
       <tbody>${tableRows}</tbody>
     </table>
+  </div>
   </body></html>`;
 
   const win = window.open('', '_blank');
