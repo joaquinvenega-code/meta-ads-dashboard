@@ -621,12 +621,12 @@ const BASE_COLS = [
   { key:'addToCart',       label:'Agreg. carrito',       type:'ecommerce' },
   { key:'checkouts',       label:'Pagos iniciados',      type:'ecommerce' },
   { key:'costPerPurchase', label:'Costo x compra',       type:'ecommerce' },
-  { key:'messages',        label:'Mensajes',             type:'messaging' },
-  { key:'costPerMessage',  label:'Costo/msg',            type:'messaging' },
+  { key:'messagesReal',        label:'Mensajes',             type:'messaging' },
+  { key:'costPerMessageReal',  label:'Costo/msg',            type:'messaging' },
 ];
 let visibleColKeys = new Set(JSON.parse(localStorage.getItem('cr_viscols') || 'null') ||
   ['objetivo','spend','revenue','roas','objPct','budgetPct','ctr','clicks',
-   'purchases','addToCart','checkouts','costPerPurchase','messages','costPerMessage']);
+   'purchases','addToCart','checkouts','costPerPurchase','messagesReal','costPerMessageReal']);
 let colOrderArr = (colOrder && BASE_COLS.every(c => colOrder.includes(c.key)))
   ? colOrder : BASE_COLS.map(c=>c.key);
 
@@ -733,10 +733,12 @@ function mergeGroupAccounts(group) {
     addToCart:   members.reduce((a,c)=>a+(c.addToCart||0),0),
     checkouts:   members.reduce((a,c)=>a+(c.checkouts||0),0),
     messages:    members.reduce((a,c)=>a+(c.messages||0),0),
+    messagesReal:    members.reduce((a,c)=>a+(c.messagesReal||0),0),
   };
   merged.ctr            = merged.clicks>0 ? (merged.clicks/(merged.impressions||merged.clicks)*100) : 0;
   merged.costPerPurchase = merged.purchases>0 ? merged.spend/merged.purchases : 0;
   merged.costPerMessage  = merged.messages>0  ? merged.spend/merged.messages  : 0;
+  merged.costPerMessageReal = merged.messagesReal>0 ? merged.spend/merged.messagesReal : 0;
   // Attach group-level settings (objective, budget, currency) so semaphore works
   const gid = Object.keys(clientGroups).find(k => clientGroups[k] === group);
   const gs = groupSettings['group_'+gid] || {};
@@ -796,7 +798,7 @@ function fmtCurrency(n, accId) {
   return sym + new Intl.NumberFormat('es-AR', { maximumFractionDigits:0 }).format(n);
 }
 const fmtN   = n => (n == null || isNaN(n)) ? '—' : new Intl.NumberFormat('es-AR',{maximumFractionDigits:0}).format(n);
-const fmtDec = (n,d=2) => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(d);
+const fmtDec = (n,d=2) => (n == null || isNaN(n)) ? '—' : new Intl.NumberFormat('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
 
 function totalRevenue(acc) {
   // For groups, manualRevenue not applied individually (set on group level)
@@ -1047,31 +1049,98 @@ function launchApp(readonly) {
 // ══════════════════════════════════════
 // DATA FETCH
 // ══════════════════════════════════════
+// Objetivos de Meta que corresponden a campañas de mensajería real
+const MESSAGING_OBJECTIVES = new Set([
+  'MESSAGES','OUTCOME_ENGAGEMENT', // objetivo Mensajes
+  'PAGE_LIKES','LEAD_GENERATION'   // algunos legacy con mensajes directos
+]);
+
+function fetchMessagingCampaignInsights(accountId, dp) {
+  // Trae insights a nivel campaña y filtra solo las de objetivo mensajería
+  // para calcular mensajes y costo real sin campañas de tráfico/conversiones
+  return new Promise(resolve => {
+    if (!accessToken) return resolve({ messagesReal:0, costPerMessageReal:0 });
+    FB.api(`/${accountId}/insights`, 'GET',
+      {
+        fields: 'spend,actions,campaign_id',
+        time_range: JSON.stringify(dp),
+        level: 'campaign',
+        limit: 500,
+        access_token: accessToken
+      },
+      res => {
+        if (!res || res.error || !res.data || !res.data.length) {
+          return resolve({ messagesReal:0, costPerMessageReal:0 });
+        }
+        // Para obtener el objective de cada campaña necesitamos un batch adicional
+        // Usamos filtering por objective directamente en la llamada
+        FB.api(`/${accountId}/campaigns`, 'GET',
+          {
+            fields: 'id,objective',
+            limit: 500,
+            access_token: accessToken
+          },
+          campRes => {
+            if (!campRes || campRes.error || !campRes.data) {
+              return resolve({ messagesReal:0, costPerMessageReal:0 });
+            }
+            // Mapa campaignId → objective
+            const objMap = {};
+            campRes.data.forEach(c => { objMap[c.id] = c.objective; });
+
+            const ga = (arr,type) => { const f=(arr||[]).find(a=>a.action_type===type); return f?parseFloat(f.value):0; };
+            let messagesReal = 0, spendMsg = 0;
+
+            res.data.forEach(d => {
+              const obj = objMap[d.campaign_id] || '';
+              if (!MESSAGING_OBJECTIVES.has(obj)) return; // ignorar campañas no-mensajería
+              const msgs = ga(d.actions,'onsite_conversion.messaging_conversation_started_7d')
+                        || ga(d.actions,'onsite_conversion.total_messaging_connection');
+              messagesReal += msgs;
+              spendMsg     += parseFloat(d.spend)||0;
+            });
+
+            resolve({
+              messagesReal,
+              costPerMessageReal: messagesReal>0 ? spendMsg/messagesReal : 0
+            });
+          }
+        );
+      }
+    );
+  });
+}
+
 function fetchInsights(accountId, dp) {
   return new Promise(resolve => {
-    if (!accessToken) { console.warn('[MetaDash] fetchInsights: no accessToken'); return resolve({ spend:0,clicks:0,ctr:0,revenue:0,purchases:0,addToCart:0,checkouts:0,costPerPurchase:0,messages:0,costPerMessage:0 }); }
+    if (!accessToken) { console.warn('[MetaDash] fetchInsights: no accessToken'); return resolve({ spend:0,clicks:0,ctr:0,revenue:0,purchases:0,addToCart:0,checkouts:0,costPerPurchase:0,messages:0,costPerMessage:0,messagesReal:0,costPerMessageReal:0 }); }
     const fields = 'spend,clicks,ctr,actions,action_values,cost_per_action_type';
     FB.api(`/${accountId}/insights`,'GET',
       { fields, time_range:JSON.stringify(dp), level:'account', access_token:accessToken },
       res => {
         if (res && res.error) console.warn('[MetaDash] Insights error for', accountId, res.error.message);
-        if (!res||!res.data||!res.data.length) return resolve({ spend:0,clicks:0,ctr:0,revenue:0,purchases:0,addToCart:0,checkouts:0,costPerPurchase:0,messages:0,costPerMessage:0 });
+        if (!res||!res.data||!res.data.length) return resolve({ spend:0,clicks:0,ctr:0,revenue:0,purchases:0,addToCart:0,checkouts:0,costPerPurchase:0,messages:0,costPerMessage:0,messagesReal:0,costPerMessageReal:0 });
         const d = res.data[0];
         const ga = (arr,type) => { const f=(arr||[]).find(a=>a.action_type===type); return f?parseFloat(f.value):0; };
         const purchases = ga(d.actions,'purchase')||ga(d.actions,'offsite_conversion.fb_pixel_purchase');
         const messages  = ga(d.actions,'onsite_conversion.messaging_conversation_started_7d')||ga(d.actions,'onsite_conversion.total_messaging_connection');
         const spend     = parseFloat(d.spend)||0;
-        resolve({
-          spend,
-          clicks:          parseInt(d.clicks)||0,
-          ctr:             parseFloat(d.ctr)||0,
-          revenue:         ga(d.action_values,'purchase')||ga(d.action_values,'offsite_conversion.fb_pixel_purchase'),
-          purchases,
-          addToCart:       ga(d.actions,'add_to_cart')||ga(d.actions,'offsite_conversion.fb_pixel_add_to_cart'),
-          checkouts:       ga(d.actions,'initiate_checkout')||ga(d.actions,'offsite_conversion.fb_pixel_initiate_checkout'),
-          costPerPurchase: purchases>0 ? spend/purchases : 0,
-          messages,
-          costPerMessage:  messages>0  ? spend/messages  : 0,
+        // Traer mensajes reales (solo campañas de mensajería) en paralelo
+        fetchMessagingCampaignInsights(accountId, dp).then(msgData => {
+          resolve({
+            spend,
+            clicks:               parseInt(d.clicks)||0,
+            ctr:                  parseFloat(d.ctr)||0,
+            revenue:              ga(d.action_values,'purchase')||ga(d.action_values,'offsite_conversion.fb_pixel_purchase'),
+            purchases,
+            addToCart:            ga(d.actions,'add_to_cart')||ga(d.actions,'offsite_conversion.fb_pixel_add_to_cart'),
+            checkouts:            ga(d.actions,'initiate_checkout')||ga(d.actions,'offsite_conversion.fb_pixel_initiate_checkout'),
+            costPerPurchase:      purchases>0 ? spend/purchases : 0,
+            messages,
+            costPerMessage:       messages>0  ? spend/messages  : 0,
+            messagesReal:         msgData.messagesReal,
+            costPerMessageReal:   msgData.costPerMessageReal,
+          });
         });
       }
     );
@@ -1448,7 +1517,7 @@ function renderDetail() {
         if(c.key==='objPct')    return `<td>${obj?pbar(objPct,sem.color):'—'}</td>`;
         if(c.key==='budgetPct'){const bc=budPct>100?'var(--red)':budPct>85?'var(--amber)':'var(--green)';return`<td>${bud?pbar(budPct,bc):'—'}</td>`;}
         if(c.key==='ctr')       return `<td>${fmtDec(acc.ctr,2)}%</td>`;
-        if(['costPerPurchase','costPerMessage'].includes(c.key)) return `<td>${acc[c.key]>0?sym+fmtDec(acc[c.key],2):'—'}</td>`;
+        if(['costPerPurchase','costPerMessageReal'].includes(c.key)) return `<td>${acc[c.key]>0?sym+fmtDec(acc[c.key],2):'—'}</td>`;
         if(['spend','revenue'].includes(c.key)) return `<td>${fmtCurrency(acc[c.key],acc.id)}</td>`;
         return `<td>${fmtN(acc[c.key])}</td>`;
       }).join('')}
@@ -1487,8 +1556,8 @@ function renderDetail() {
         <div class="dcard"><div class="dl">Pagos iniciados</div><div class="dv">${fmtN(acc.checkouts)}</div></div>
         <div class="dcard"><div class="dl">Costo x compra</div><div class="dv">${acc.costPerPurchase>0?sym+fmtDec(acc.costPerPurchase,2):'—'}</div></div>`:''}
         ${msg?`
-        <div class="dcard"><div class="dl">Mensajes</div><div class="dv">${fmtN(acc.messages)}</div></div>
-        <div class="dcard"><div class="dl">Costo x msg</div><div class="dv">${acc.costPerMessage>0?sym+fmtDec(acc.costPerMessage,2):'—'}</div></div>`:''}
+        <div class="dcard"><div class="dl">Mensajes</div><div class="dv">${fmtN(acc.messagesReal)}</div></div>
+        <div class="dcard"><div class="dl">Costo x msg</div><div class="dv">${acc.costPerMessageReal>0?sym+fmtDec(acc.costPerMessageReal,2):'—'}</div></div>`:''}
       </div>
       ${!isReadonly && msg ? `
       <div style="padding:12px;background:var(--amber-bg);border-radius:var(--radius);margin-bottom:10px;border:0.5px solid var(--amber)">
@@ -2138,7 +2207,7 @@ function buildSnapshotHTML() {
       <td style="padding:10px 12px;font-size:13px">${objPct!==null?objPct+'%':'—'}</td>
       <td style="padding:10px 12px;font-size:13px">${fmtDec(acc.ctr,2)}%</td>
       ${ecom?`<td style="padding:10px 12px;font-size:13px">${fmtN(acc.purchases)}</td><td style="padding:10px 12px;font-size:13px">${acc.costPerPurchase>0?sym+fmtDec(acc.costPerPurchase,2):'—'}</td>`:'<td colspan="2" style="padding:10px 12px;color:#aaa;font-size:12px">— e-commerce</td>'}
-      ${msg?`<td style="padding:10px 12px;font-size:13px">${fmtN(acc.messages)}</td><td style="padding:10px 12px;font-size:13px">${acc.costPerMessage>0?sym+fmtDec(acc.costPerMessage,2):'—'}</td>`:'<td colspan="2" style="padding:10px 12px;color:#aaa;font-size:12px">— mensajería</td>'}
+      ${msg?`<td style="padding:10px 12px;font-size:13px">${fmtN(acc.messagesReal)}</td><td style="padding:10px 12px;font-size:13px">${acc.costPerMessageReal>0?sym+fmtDec(acc.costPerMessageReal,2):'—'}</td>`:'<td colspan="2" style="padding:10px 12px;color:#aaa;font-size:12px">— mensajería</td>'}
       <td style="padding:10px 12px;font-size:12px;color:#555;max-width:200px">${obs||'<span style="color:#ccc">—</span>'}</td>
     </tr>`;
   }).join('');
@@ -2266,7 +2335,7 @@ function exportReport(format) {
       else if(c.key==='objPct')     row[c.label] = obj ? objPct+'%' : '—';
       else if(c.key==='budgetPct')  row[c.label] = bud ? budPct+'%' : '—';
       else if(c.key==='ctr')        row[c.label] = fmtDec(acc.ctr,2)+'%';
-      else if(['costPerPurchase','costPerMessage'].includes(c.key)) row[c.label] = acc[c.key]>0 ? sym+fmtDec(acc[c.key],2) : '—';
+      else if(['costPerPurchase','costPerMessageReal'].includes(c.key)) row[c.label] = acc[c.key]>0 ? sym+fmtDec(acc[c.key],2) : '—';
       else if(['spend','revenue'].includes(c.key)) row[c.label] = sym+fmtN(Math.round(acc[c.key]||0));
       else row[c.label] = fmtN(acc[c.key]);
     });
