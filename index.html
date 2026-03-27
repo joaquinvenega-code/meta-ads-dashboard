@@ -2306,19 +2306,15 @@ function exportExcel(rows, dateLabel) {
 
 function exportPDFReport(rows, activeCols, dateLabel, list) {
   const today = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'});
-  const headers = ['Cliente', 'Estado', 'Proyectado', ...activeCols.map(c=>c.label), 'Observaciones'];
+  // Excluir columnas bloqueadas (objPct, budgetPct) del PDF
+  const EXCLUDED_KEYS = new Set(['objPct','budgetPct']);
+  const pdfCols = activeCols.filter(c => !EXCLUDED_KEYS.has(c.key));
+  const headers = ['Cliente', ...pdfCols.map(c=>c.label), 'Observaciones'];
 
   const tableRows = rows.map((row, i) => {
-    const acc = list[i];
-    const s = settings[acc.id]||{};
-    const obj = s.objective||0;
-    const sem = semaphore(acc);
-    const projected = obj>0 ? Math.round(((acc.revenue/obj)/monthProgress)*100) : null;
     const cells = [
       `<td><strong>${row.nombre}</strong></td>`,
-      `<td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${sem.color};margin-right:5px"></span>${sem.label}</td>`,
-      `<td>${projected!==null ? projected+'%' : '—'}</td>`,
-      ...activeCols.map(c => `<td>${row[c.label]||'—'}</td>`),
+      ...pdfCols.map(c => `<td>${row[c.label]||'—'}</td>`),
       `<td style="font-size:11px;color:#555;max-width:200px">${row.observaciones||''}</td>`,
     ];
     return `<tr style="background:${i%2===0?'#fff':'#f9f9f9'}">${cells.join('')}</tr>`;
