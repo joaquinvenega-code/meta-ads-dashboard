@@ -1651,6 +1651,32 @@ function toggleDetail(id) {
 // ══════════════════════════════════════
 // TOP ADS
 // ══════════════════════════════════════
+// Helpers globales para las miniaturas (referenciados desde onload/onerror inline).
+// Umbral: si la imagen natural es < 400px de ancho, la consideramos "baja calidad"
+// y hacemos swap al iframe del preview (que SÍ renderiza el creativo real).
+window._topAdsSwapToIframe = function(img, adId, reason) {
+  img.style.display = 'none';
+  const ph = document.getElementById('adph-' + adId);
+  if (ph) {
+    // El placeholder contiene el iframe del preview; lo mostramos como block
+    // para que el iframe-wrap interior ocupe 100% (aspect-ratio 1).
+    ph.style.display = 'block';
+    ph.style.padding = '0';
+    ph.style.background = 'transparent';
+  }
+  console.log('[TopAds] swap→iframe', adId, reason || '');
+};
+window._topAdsOnThumbLoad = function(img, adId) {
+  const w = img.naturalWidth || 0, h = img.naturalHeight || 0;
+  console.log('[TopAds] thumb OK', adId, w + 'x' + h, (img.src||'').slice(0,90));
+  if (w < 400 || h < 400) {
+    window._topAdsSwapToIframe(img, adId, 'low-res ' + w + 'x' + h);
+  }
+};
+window._topAdsOnThumbError = function(img, adId) {
+  window._topAdsSwapToIframe(img, adId, 'img error');
+};
+
 async function loadTopAds(accountId) {
   const container = document.getElementById('top-ads-content-'+accountId);
   const nSel = document.getElementById('top-ads-n-'+accountId);
@@ -1687,8 +1713,8 @@ async function loadTopAds(accountId) {
       const thumb = ad.thumbnail
         ? '<img class="ad-thumb" src="' + ad.thumbnail + '" alt="" id="adimg-' + ad.id + '" ' +
           'referrerpolicy="no-referrer" loading="lazy" ' +
-          'onload="console.log(\'[TopAds] thumb OK\',\'' + ad.id + '\',this.naturalWidth+\'x\'+this.naturalHeight,this.src.slice(0,90));" ' +
-          'onerror="this.style.display=\'none\';var p=document.getElementById(\'adph-' + ad.id + '\');if(p)p.style.display=\'flex\';">' +
+          'onload="window._topAdsOnThumbLoad(this,\'' + ad.id + '\')" ' +
+          'onerror="window._topAdsOnThumbError(this,\'' + ad.id + '\')">' +
           '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">' + iframePreview + '</div>'
         : iframePreview;
 
@@ -1717,14 +1743,6 @@ async function loadTopAds(accountId) {
     }).join('');
 
     container.innerHTML = '<div class="top-ads-grid">' + cards + '</div>';
-    // Aplicar onerror a las miniaturas después de insertar en DOM
-    container.querySelectorAll('img.ad-thumb').forEach(img => {
-      img.onerror = function() {
-        this.style.display = 'none';
-        const ph = this.nextElementSibling;
-        if (ph) ph.style.display = 'flex';
-      };
-    });
 
   } catch(e) {
     console.error('[TopAds]', e);
