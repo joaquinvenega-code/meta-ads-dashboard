@@ -1760,14 +1760,12 @@ function fetchTopAdsData(accountId, dp, n) {
         if (cr.thumbnail_url) return cr.thumbnail_url;
         // 2) imagen directa (ads estáticos)
         if (cr.image_url) return cr.image_url;
-        // 3) "picture" clásico (link ads viejos)
-        if (cr.picture) return cr.picture;
-        // 4) object_story_spec → link_data / photo_data / video_data
+        // 3) object_story_spec → link_data / photo_data / video_data
         const oss = cr.object_story_spec || {};
         if (oss.link_data && oss.link_data.picture) return oss.link_data.picture;
         if (oss.photo_data && oss.photo_data.url) return oss.photo_data.url;
         if (oss.video_data && oss.video_data.image_url) return oss.video_data.image_url;
-        // 5) asset_feed_spec → primer image URL (DCO / dynamic creative)
+        // 4) asset_feed_spec → primer image URL (DCO / dynamic creative)
         const afs = cr.asset_feed_spec || {};
         if (Array.isArray(afs.images) && afs.images.length) {
           const img = afs.images.find(i => i && i.url) || afs.images[0];
@@ -1781,7 +1779,9 @@ function fetchTopAdsData(accountId, dp, n) {
       };
       ranked.forEach(ad => {
         FB.api('/' + ad.id, 'GET', {
-          fields: 'creative{thumbnail_url.width(400).height(400),image_url,picture,object_story_spec,asset_feed_spec,effective_object_story_id,video_id}',
+          // Nota: `picture` fue deprecado en v19.0 y, si se incluye,
+          // rompe TODA la expansión de creative (error #100).
+          fields: 'creative{thumbnail_url.width(400).height(400),image_url,object_story_spec,asset_feed_spec,effective_object_story_id,video_id}',
           access_token: accessToken
         }, adRes => {
           if (adRes && adRes.error) {
