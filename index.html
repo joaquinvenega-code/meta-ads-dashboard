@@ -170,7 +170,7 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .top-ads-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 .top-ads-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
 .top-ads-controls{display:flex;align-items:center;gap:8px}
-.top-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.top-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
 .ad-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
 .ad-thumb{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bg3);display:block}
 .ad-thumb-placeholder{width:100%;aspect-ratio:1;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
@@ -1655,15 +1655,12 @@ function toggleDetail(id) {
 window._topAdsOnThumbLoad = function(img, adId) {
   const w = img.naturalWidth || 0, h = img.naturalHeight || 0;
   console.log('[TopAds] thumb OK', adId, w + 'x' + h, (img.src||'').slice(0,90));
-  // Si la imagen es chica (<400px), NO la estiramos para llenar la tarjeta —
-  // eso se ve pixelado/borroso y al cliente le espanta. Mejor dejarla en
-  // tamaño nativo, centrada sobre fondo oscuro. Queda chiquita pero NÍTIDA
-  // y sigue siendo estática (exportable a PDF).
+  // Dejamos que el browser estire la imagen (object-fit:cover del CSS).
+  // Si es baja resolución va a quedar pixelada, pero las tarjetas son
+  // más chicas ahora así que se nota menos. Prioridad: consistencia visual
+  // (sin espacios vacíos) y estático para export a PDF.
   if (w < 400 || h < 400) {
-    img.style.objectFit = 'none';
-    img.style.objectPosition = 'center';
-    img.style.background = '#0a0a0a';
-    console.log('[TopAds] low-res native-size rendering applied', adId);
+    console.log('[TopAds] low-res (se estira igual)', adId);
   }
 };
 window._topAdsOnThumbError = function(img, adId) {
