@@ -170,7 +170,7 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .top-ads-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 .top-ads-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
 .top-ads-controls{display:flex;align-items:center;gap:8px}
-.top-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.top-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
 .ad-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
 .ad-thumb{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bg3);display:block}
 .ad-thumb-placeholder{width:100%;aspect-ratio:1;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
@@ -1862,12 +1862,33 @@ function fetchTopAdsData(accountId, dp, n) {
           let sDone = 0;
           storyAds.forEach(a => {
             FB.api('/' + a._creativeStoryId, 'GET', {
-              fields: 'full_picture,picture',
+              // attachments.media.image.src suele ser el cover del video en resolución real.
+              // subattachments cubre carousels. full_picture es fallback del post.
+              fields: 'full_picture,picture,attachments{media_type,media{image{src,height,width}},subattachments{media{image{src,height,width}}}}',
               access_token: accessToken
             }, sRes => {
               if (sRes && !sRes.error) {
-                a.thumbnail = sRes.full_picture || sRes.picture || null;
-                if (a.thumbnail) console.log('[TopAds] story-thumb', a.id, '→', a.thumbnail.slice(0,90));
+                // Intentar primero attachments (imagen hi-res de la pieza)
+                let best = null;
+                const atts = (sRes.attachments && Array.isArray(sRes.attachments.data)) ? sRes.attachments.data : [];
+                atts.forEach(at => {
+                  const candidates = [];
+                  if (at.media && at.media.image) candidates.push(at.media.image);
+                  if (at.subattachments && Array.isArray(at.subattachments.data)) {
+                    at.subattachments.data.forEach(sa => { if (sa.media && sa.media.image) candidates.push(sa.media.image); });
+                  }
+                  candidates.forEach(im => {
+                    const area = (im.width||0) * (im.height||0);
+                    if (im.src && (!best || area > best._area)) best = { src: im.src, _area: area, w: im.width, h: im.height };
+                  });
+                });
+                if (best && best.src) {
+                  a.thumbnail = best.src;
+                  console.log('[TopAds] story-attachment', a.id, '→', (best.w||'?')+'x'+(best.h||'?'));
+                } else {
+                  a.thumbnail = sRes.full_picture || sRes.picture || null;
+                  if (a.thumbnail) console.log('[TopAds] story-fullpic', a.id, '→', a.thumbnail.slice(0,90));
+                }
               } else if (sRes && sRes.error) {
                 console.warn('[TopAds] story fetch error:', sRes.error.message);
               }
