@@ -174,6 +174,8 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .ad-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
 .ad-thumb{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bg3);display:block}
 .ad-thumb-placeholder{width:100%;aspect-ratio:1;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
+.ad-thumb-iframe-wrap{width:100%;aspect-ratio:1;background:var(--bg3);overflow:hidden;position:relative}
+.ad-thumb-iframe{position:absolute;top:50%;left:50%;width:540px;height:540px;border:0;transform:translate(-50%,-50%) scale(0.42);transform-origin:center center;pointer-events:none}
 .ad-body{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:6px}
 .ad-name{font-size:11px;font-weight:600;color:var(--text);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .ad-metrics{display:grid;grid-template-columns:1fr 1fr;gap:4px}
@@ -1675,13 +1677,20 @@ async function loadTopAds(accountId) {
     const cards = ads.map((ad, i) => {
       const roas = ad.spend > 0 ? ad.revenue / ad.spend : 0;
       const cpp  = ad.purchases > 0 ? ad.spend / ad.purchases : 0;
+      // Fallback visual final: si no hay thumbnail, embedemos el preview iframe
+      // (que SÍ renderiza el creativo real, incluidos videos sin hash/permisos).
+      const iframePreview = ad.previewUrl
+        ? '<div class="ad-thumb-iframe-wrap" id="adpf-' + ad.id + '">' +
+            '<iframe class="ad-thumb-iframe" src="' + ad.previewUrl + '" scrolling="no" frameborder="0" loading="lazy" referrerpolicy="no-referrer"></iframe>' +
+          '</div>'
+        : '<div class="ad-thumb-placeholder">Sin imagen</div>';
       const thumb = ad.thumbnail
         ? '<img class="ad-thumb" src="' + ad.thumbnail + '" alt="" id="adimg-' + ad.id + '" ' +
           'referrerpolicy="no-referrer" loading="lazy" ' +
           'onload="console.log(\'[TopAds] thumb OK\',\'' + ad.id + '\',this.naturalWidth+\'x\'+this.naturalHeight,this.src.slice(0,90));" ' +
           'onerror="this.style.display=\'none\';var p=document.getElementById(\'adph-' + ad.id + '\');if(p)p.style.display=\'flex\';">' +
-          '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">Sin imagen</div>'
-        : '<div class="ad-thumb-placeholder">Sin imagen</div>';
+          '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">' + iframePreview + '</div>'
+        : iframePreview;
 
       const previewBtn = ad.previewUrl
         ? '<a class="ad-preview-link" href="' + ad.previewUrl + '" target="_blank" rel="noopener">↗ Ver anuncio</a>'
@@ -1810,7 +1819,9 @@ function fetchTopAdsData(accountId, dp, n) {
       ranked.forEach(ad => {
         FB.api('/' + ad.id, 'GET', {
           // Nota: `picture` fue deprecado en v19.0 y rompe toda la expansión si se incluye.
-          fields: 'creative{image_url,image_hash,thumbnail_url,object_story_spec,asset_feed_spec,effective_object_story_id,video_id}',
+          // thumbnail_url con .width/.height devuelve una versión hi-res (hasta 600×600)
+          // en vez del default 64×64 — esto mejora MUCHO el fallback final.
+          fields: 'creative{image_url,image_hash,thumbnail_url.width(600).height(600),object_story_spec,asset_feed_spec,effective_object_story_id,video_id}',
           access_token: accessToken
         }, adRes => {
           if (adRes && adRes.error) {
@@ -1846,12 +1857,13 @@ function fetchTopAdsData(accountId, dp, n) {
               a.thumbnail = pickThumb(a._creative);
               if (a.thumbnail) console.log('[TopAds] creative-fb', a.id, '→', a.thumbnail.slice(0,90));
             });
-            // 4) Último recurso: el 64x64 feo, pero al menos no deja vacío
+            // 4) Penúltimo recurso: thumbnail_url (ahora pedido a 600×600, no 64×64).
+            //    Si no hay nada mejor, al menos es decente.
             ranked.forEach(a => {
               if (a.thumbnail || !a._creative) return;
               if (a._creative.thumbnail_url) {
                 a.thumbnail = a._creative.thumbnail_url;
-                console.warn('[TopAds] LOW-RES fallback for', a.id, '→ 64x64 thumbnail_url (no hay alternativa)');
+                console.log('[TopAds] thumbnail_url 600px fallback for', a.id);
               }
             });
             // Limpieza
@@ -1908,7 +1920,9 @@ function fetchTopAdsData(accountId, dp, n) {
           if (hRes && !hRes.error && Array.isArray(hRes.data)) {
             hRes.data.forEach(im => {
               if (im && im.hash) {
-                urlByHash[im.hash] = im.permalink_url || im.url || null;
+                // IMPORTANTE: `url` es el CDN directo del archivo (JPG).
+                // `permalink_url` es una página HTML de Ads Manager y NO carga en un <img>.
+                urlByHash[im.hash] = im.url || im.permalink_url || null;
                 console.log('[TopAds] adimage', im.hash.slice(0,8), '→', (im.width||'?')+'x'+(im.height||'?'));
               }
             });
