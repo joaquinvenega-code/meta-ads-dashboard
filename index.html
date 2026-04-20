@@ -1717,66 +1717,68 @@ function fetchTopAdsData(accountId, dp, n) {
   return new Promise((resolve, reject) => {
     if (!accessToken) return resolve([]);
 
-    const fields = 'id,name,creative{thumbnail_url,effective_instagram_media_id},insights.fields(spend,ctr,actions,action_values){time_range}';
+    const ga = (arr, type) => { const f = (arr||[]).find(a => a.action_type === type); return f ? parseFloat(f.value) : 0; };
 
-    // Primero traemos insights a nivel ad para rankear por ROAS
-    FB.api('/' + accountId + '/ads', 'GET', {
-      fields: 'id,name,creative{thumbnail_url},status',
-      limit: 200,
+    // Paso 1: insights a nivel ad con el time_range correcto
+    FB.api('/' + accountId + '/insights', 'GET', {
+      fields: 'ad_id,ad_name,spend,ctr,actions,action_values',
+      time_range: JSON.stringify(dp),
+      level: 'ad',
+      limit: 500,
       access_token: accessToken
-    }, adsRes => {
-      if (!adsRes || adsRes.error || !adsRes.data || !adsRes.data.length) return resolve([]);
+    }, insRes => {
+      if (!insRes || insRes.error || !insRes.data || !insRes.data.length) {
+        console.warn('[TopAds] insights error:', insRes && insRes.error);
+        return resolve([]);
+      }
 
-      const adIds = adsRes.data.map(a => a.id);
-      const adMeta = {};
-      adsRes.data.forEach(a => { adMeta[a.id] = a; });
+      // Rankear por ROAS, filtrar los que tienen gasto
+      const ranked = insRes.data
+        .map(d => {
+          const spend     = parseFloat(d.spend) || 0;
+          const purchases = ga(d.actions, 'purchase') || ga(d.actions, 'offsite_conversion.fb_pixel_purchase');
+          const revenue   = ga(d.action_values, 'purchase') || ga(d.action_values, 'offsite_conversion.fb_pixel_purchase');
+          const ctr       = parseFloat(d.ctr) || 0;
+          const roas      = spend > 0 ? revenue / spend : 0;
+          return { id: d.ad_id, name: d.ad_name || d.ad_id, spend, purchases, revenue, ctr, roas, thumbnail: null, previewUrl: null };
+        })
+        .filter(a => a.spend > 0)
+        .sort((a, b) => b.roas - a.roas)
+        .slice(0, n);
 
-      // Traer insights de todos los ads en batch
-      FB.api('/' + accountId + '/ads', 'GET', {
-        fields: 'id,insights.fields(spend,ctr,actions,action_values){time_range:' + JSON.stringify(dp) + '}',
-        limit: 200,
-        access_token: accessToken
-      }, insRes => {
-        if (!insRes || insRes.error || !insRes.data) return resolve([]);
+      if (!ranked.length) return resolve([]);
 
-        const ga = (arr, type) => { const f = (arr||[]).find(a => a.action_type === type); return f ? parseFloat(f.value) : 0; };
-
-        const ranked = insRes.data
-          .filter(a => a.insights && a.insights.data && a.insights.data.length)
-          .map(a => {
-            const d = a.insights.data[0];
-            const spend    = parseFloat(d.spend) || 0;
-            const purchases = ga(d.actions, 'purchase') || ga(d.actions, 'offsite_conversion.fb_pixel_purchase');
-            const revenue   = ga(d.action_values, 'purchase') || ga(d.action_values, 'offsite_conversion.fb_pixel_purchase');
-            const ctr      = parseFloat(d.ctr) || 0;
-            const roas     = spend > 0 ? revenue / spend : 0;
-            const meta     = adMeta[a.id] || {};
-            const thumbnail = meta.creative && meta.creative.thumbnail_url ? meta.creative.thumbnail_url : null;
-            return { id: a.id, name: meta.name || a.id, spend, purchases, revenue, ctr, roas, thumbnail, previewUrl: null };
-          })
-          .filter(a => a.spend > 0)
-          .sort((a, b) => b.roas - a.roas)
-          .slice(0, n);
-
-        if (!ranked.length) return resolve([]);
-
-        // Traer preview URLs para los top N ads
-        let done = 0;
-        ranked.forEach(ad => {
-          FB.api('/' + ad.id + '/previews', 'GET', {
-            ad_format: 'DESKTOP_FEED_STANDARD',
-            access_token: accessToken
-          }, prevRes => {
-            if (prevRes && prevRes.data && prevRes.data.length) {
-              // El preview viene como iframe HTML, extraemos el src
-              const iframeMatch = prevRes.data[0].body.match(/src="([^"]+)"/);
-              if (iframeMatch) ad.previewUrl = iframeMatch[1].replace(/&amp;/g, '&');
-            }
-            done++;
-            if (done === ranked.length) resolve(ranked);
-          });
+      // Paso 2: traer thumbnails para los top N
+      let thumbDone = 0;
+      ranked.forEach(ad => {
+        FB.api('/' + ad.id, 'GET', {
+          fields: 'creative{thumbnail_url,picture}',
+          access_token: accessToken
+        }, adRes => {
+          if (adRes && !adRes.error && adRes.creative) {
+            ad.thumbnail = adRes.creative.thumbnail_url || adRes.creative.picture || null;
+          }
+          thumbDone++;
+          if (thumbDone === ranked.length) fetchPreviews(ranked, resolve);
         });
       });
+    });
+  });
+}
+
+function fetchPreviews(ranked, resolve) {
+  let done = 0;
+  ranked.forEach(ad => {
+    FB.api('/' + ad.id + '/previews', 'GET', {
+      ad_format: 'DESKTOP_FEED_STANDARD',
+      access_token: accessToken
+    }, prevRes => {
+      if (prevRes && !prevRes.error && prevRes.data && prevRes.data.length) {
+        const iframeMatch = prevRes.data[0].body.match(/src="([^"]+)"/);
+        if (iframeMatch) ad.previewUrl = iframeMatch[1].replace(/&amp;/g, '&');
+      }
+      done++;
+      if (done === ranked.length) resolve(ranked);
     });
   });
 }
