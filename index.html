@@ -161,6 +161,28 @@ tr.row-hidden{display:none}
 .dv{font-size:16px;font-weight:700}
 textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--radius);padding:8px 12px;font-size:13px;font-family:inherit;resize:vertical;min-height:60px;background:var(--bg);color:var(--text)}
 
+
+/* ── TOP ADS ── */
+.top-ads-section{margin-top:16px;border-top:0.5px solid var(--border);padding-top:14px}
+.top-ads-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.top-ads-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.top-ads-controls{display:flex;align-items:center;gap:8px}
+.top-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.ad-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
+.ad-thumb{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bg3);display:block}
+.ad-thumb-placeholder{width:100%;aspect-ratio:1;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
+.ad-body{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:6px}
+.ad-name{font-size:11px;font-weight:600;color:var(--text);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ad-metrics{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ad-metric{background:var(--bg2);border-radius:5px;padding:5px 7px}
+.ad-metric-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.03em}
+.ad-metric-value{font-size:12px;font-weight:700;color:var(--text)}
+.ad-roas{font-size:13px;font-weight:800;color:var(--green)}
+.ad-footer{padding:8px 12px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.ad-rank{font-size:10px;font-weight:700;color:var(--text3)}
+.ad-preview-link{font-size:11px;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:3px}
+.ad-preview-link:hover{text-decoration:underline}
+.top-ads-loading{text-align:center;padding:20px;color:var(--text3);font-size:13px}
 /* ── COL TOGGLES ── */
 .col-cfg{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);margin-bottom:14px;align-items:center}
 .col-cfg-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
@@ -1585,6 +1607,21 @@ function renderDetail() {
           <button class="btn btn-sm btn-primary" id="savebtn-${acc.id}" onclick="saveObs('${acc.id}',event)">Guardar observación</button>
         </div>
       </div>`:''}
+      <div class="top-ads-section" id="top-ads-section-${acc.id}">
+        <div class="top-ads-header">
+          <span class="top-ads-title">🏆 Anuncios ganadores</span>
+          <div class="top-ads-controls">
+            <label style="font-size:12px;color:var(--text2)">Top</label>
+            <select id="top-ads-n-${acc.id}" style="padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text)" onchange="loadTopAds('${acc.id}')">
+              <option value="3">3</option>
+              <option value="5" selected>5</option>
+              <option value="10">10</option>
+            </select>
+            <button class="btn btn-xs" onclick="loadTopAds('${acc.id}')">Cargar</button>
+          </div>
+        </div>
+        <div id="top-ads-content-${acc.id}" class="top-ads-loading" style="display:none"></div>
+      </div>
     </div></td>`;
     body.appendChild(detRow);
   });
@@ -1593,7 +1630,155 @@ function renderDetail() {
 function toggleDetail(id) {
   const det = document.getElementById('det-'+id);
   if (!det) return;
-  det.style.display = det.style.display==='table-row' ? 'none' : 'table-row';
+  const isOpening = det.style.display !== 'table-row';
+  det.style.display = isOpening ? 'table-row' : 'none';
+  // Cargar top ads la primera vez que se abre
+  if (isOpening) {
+    const content = document.getElementById('top-ads-content-'+id);
+    if (content && content.style.display === 'none') loadTopAds(id);
+  }
+}
+
+// ══════════════════════════════════════
+// TOP ADS
+// ══════════════════════════════════════
+async function loadTopAds(accountId) {
+  const container = document.getElementById('top-ads-content-'+accountId);
+  const nSel = document.getElementById('top-ads-n-'+accountId);
+  if (!container) return;
+  const n = nSel ? parseInt(nSel.value) : 5;
+
+  container.style.display = 'block';
+  container.innerHTML = '<div class="top-ads-loading">Cargando anuncios...</div>';
+
+  try {
+    const acc = accountsData.find(a => a.id === accountId) || {};
+    const s = settings[accountId] || {};
+    const cur = s.currency || 'ARS';
+    const sym = CURRENCY_SYMBOLS[cur] || '$';
+    const dp = getDateParams('datePreset','dateFrom1','dateTo1');
+
+    const ads = await fetchTopAdsData(accountId, dp, n);
+
+    if (!ads.length) {
+      container.innerHTML = '<div class="top-ads-loading" style="color:var(--text3)">No se encontraron anuncios con datos en este período.</div>';
+      return;
+    }
+
+    const cards = ads.map((ad, i) => {
+      const roas = ad.spend > 0 ? ad.revenue / ad.spend : 0;
+      const cpp  = ad.purchases > 0 ? ad.spend / ad.purchases : 0;
+      const thumb = ad.thumbnail
+        ? '<img class="ad-thumb" src="' + ad.thumbnail + '" alt="" id="adimg-' + ad.id + '">' +
+          '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">Sin imagen</div>'
+        : '<div class="ad-thumb-placeholder">Sin imagen</div>';
+
+      const previewBtn = ad.previewUrl
+        ? '<a class="ad-preview-link" href="' + ad.previewUrl + '" target="_blank" rel="noopener">↗ Ver anuncio</a>'
+        : '<span style="font-size:11px;color:var(--text3)">Sin preview</span>';
+
+      return '<div class="ad-card">' +
+        thumb +
+        '<div class="ad-body">' +
+          '<div class="ad-name" title="' + (ad.name||'').replace(/"/g,"'") + '">' + (ad.name || 'Sin nombre') + '</div>' +
+          '<div class="ad-metrics">' +
+            '<div class="ad-metric"><div class="ad-metric-label">ROAS</div><div class="ad-metric-value ad-roas">×' + fmtDec(roas) + '</div></div>' +
+            '<div class="ad-metric"><div class="ad-metric-label">CTR</div><div class="ad-metric-value">' + fmtDec(ad.ctr, 2) + '%</div></div>' +
+            '<div class="ad-metric"><div class="ad-metric-label">Invertido</div><div class="ad-metric-value">' + sym + fmtN(Math.round(ad.spend)) + '</div></div>' +
+            '<div class="ad-metric"><div class="ad-metric-label">Compras</div><div class="ad-metric-value">' + fmtN(ad.purchases) + '</div></div>' +
+            '<div class="ad-metric"><div class="ad-metric-label">Valor conv.</div><div class="ad-metric-value">' + sym + fmtN(Math.round(ad.revenue)) + '</div></div>' +
+            '<div class="ad-metric"><div class="ad-metric-label">Costo/compra</div><div class="ad-metric-value">' + (cpp > 0 ? sym + fmtDec(cpp, 2) : '—') + '</div></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ad-footer">' +
+          '<span class="ad-rank">#' + (i+1) + ' por ROAS</span>' +
+          previewBtn +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    container.innerHTML = '<div class="top-ads-grid">' + cards + '</div>';
+    // Aplicar onerror a las miniaturas después de insertar en DOM
+    container.querySelectorAll('img.ad-thumb').forEach(img => {
+      img.onerror = function() {
+        this.style.display = 'none';
+        const ph = this.nextElementSibling;
+        if (ph) ph.style.display = 'flex';
+      };
+    });
+
+  } catch(e) {
+    console.error('[TopAds]', e);
+    container.innerHTML = '<div class="top-ads-loading" style="color:var(--red)">Error al cargar anuncios. Revisá los permisos de la app.</div>';
+  }
+}
+
+function fetchTopAdsData(accountId, dp, n) {
+  return new Promise((resolve, reject) => {
+    if (!accessToken) return resolve([]);
+
+    const fields = 'id,name,creative{thumbnail_url,effective_instagram_media_id},insights.fields(spend,ctr,actions,action_values){time_range}';
+
+    // Primero traemos insights a nivel ad para rankear por ROAS
+    FB.api('/' + accountId + '/ads', 'GET', {
+      fields: 'id,name,creative{thumbnail_url},status',
+      limit: 200,
+      access_token: accessToken
+    }, adsRes => {
+      if (!adsRes || adsRes.error || !adsRes.data || !adsRes.data.length) return resolve([]);
+
+      const adIds = adsRes.data.map(a => a.id);
+      const adMeta = {};
+      adsRes.data.forEach(a => { adMeta[a.id] = a; });
+
+      // Traer insights de todos los ads en batch
+      FB.api('/' + accountId + '/ads', 'GET', {
+        fields: 'id,insights.fields(spend,ctr,actions,action_values){time_range:' + JSON.stringify(dp) + '}',
+        limit: 200,
+        access_token: accessToken
+      }, insRes => {
+        if (!insRes || insRes.error || !insRes.data) return resolve([]);
+
+        const ga = (arr, type) => { const f = (arr||[]).find(a => a.action_type === type); return f ? parseFloat(f.value) : 0; };
+
+        const ranked = insRes.data
+          .filter(a => a.insights && a.insights.data && a.insights.data.length)
+          .map(a => {
+            const d = a.insights.data[0];
+            const spend    = parseFloat(d.spend) || 0;
+            const purchases = ga(d.actions, 'purchase') || ga(d.actions, 'offsite_conversion.fb_pixel_purchase');
+            const revenue   = ga(d.action_values, 'purchase') || ga(d.action_values, 'offsite_conversion.fb_pixel_purchase');
+            const ctr      = parseFloat(d.ctr) || 0;
+            const roas     = spend > 0 ? revenue / spend : 0;
+            const meta     = adMeta[a.id] || {};
+            const thumbnail = meta.creative && meta.creative.thumbnail_url ? meta.creative.thumbnail_url : null;
+            return { id: a.id, name: meta.name || a.id, spend, purchases, revenue, ctr, roas, thumbnail, previewUrl: null };
+          })
+          .filter(a => a.spend > 0)
+          .sort((a, b) => b.roas - a.roas)
+          .slice(0, n);
+
+        if (!ranked.length) return resolve([]);
+
+        // Traer preview URLs para los top N ads
+        let done = 0;
+        ranked.forEach(ad => {
+          FB.api('/' + ad.id + '/previews', 'GET', {
+            ad_format: 'DESKTOP_FEED_STANDARD',
+            access_token: accessToken
+          }, prevRes => {
+            if (prevRes && prevRes.data && prevRes.data.length) {
+              // El preview viene como iframe HTML, extraemos el src
+              const iframeMatch = prevRes.data[0].body.match(/src="([^"]+)"/);
+              if (iframeMatch) ad.previewUrl = iframeMatch[1].replace(/&amp;/g, '&');
+            }
+            done++;
+            if (done === ranked.length) resolve(ranked);
+          });
+        });
+      });
+    });
+  });
 }
 
 // ══════════════════════════════════════
