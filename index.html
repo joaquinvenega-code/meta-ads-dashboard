@@ -1655,13 +1655,15 @@ function toggleDetail(id) {
 window._topAdsOnThumbLoad = function(img, adId) {
   const w = img.naturalWidth || 0, h = img.naturalHeight || 0;
   console.log('[TopAds] thumb OK', adId, w + 'x' + h, (img.src||'').slice(0,90));
-  // Si la imagen es muy chica (≤128px), aplicamos filtros para suavizar el pixelado
-  // y un fondo para que no se vea estirada horriblemente. Sigue siendo estática.
-  if (w <= 128 || h <= 128) {
-    img.style.imageRendering = 'auto';
-    img.style.filter = 'blur(1px)';
-    img.style.objectFit = 'cover';
-    console.log('[TopAds] low-res styling applied', adId);
+  // Si la imagen es chica (<400px), NO la estiramos para llenar la tarjeta —
+  // eso se ve pixelado/borroso y al cliente le espanta. Mejor dejarla en
+  // tamaño nativo, centrada sobre fondo oscuro. Queda chiquita pero NÍTIDA
+  // y sigue siendo estática (exportable a PDF).
+  if (w < 400 || h < 400) {
+    img.style.objectFit = 'none';
+    img.style.objectPosition = 'center';
+    img.style.background = '#0a0a0a';
+    console.log('[TopAds] low-res native-size rendering applied', adId);
   }
 };
 window._topAdsOnThumbError = function(img, adId) {
