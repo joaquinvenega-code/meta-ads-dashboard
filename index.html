@@ -167,7 +167,7 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .top-ads-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 .top-ads-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
 .top-ads-controls{display:flex;align-items:center;gap:8px}
-.top-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.top-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
 .ad-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
 .ad-thumb{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bg3);display:block}
 .ad-thumb-placeholder{width:100%;aspect-ratio:1;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
@@ -1671,6 +1671,7 @@ async function loadTopAds(accountId) {
       const thumb = ad.thumbnail
         ? '<img class="ad-thumb" src="' + ad.thumbnail + '" alt="" id="adimg-' + ad.id + '" ' +
           'referrerpolicy="no-referrer" loading="lazy" ' +
+          'onload="console.log(\'[TopAds] thumb OK\',\'' + ad.id + '\',this.naturalWidth+\'x\'+this.naturalHeight,this.src.slice(0,90));" ' +
           'onerror="this.style.display=\'none\';var p=document.getElementById(\'adph-' + ad.id + '\');if(p)p.style.display=\'flex\';">' +
           '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">Sin imagen</div>'
         : '<div class="ad-thumb-placeholder">Sin imagen</div>';
@@ -1799,7 +1800,6 @@ function fetchTopAdsData(accountId, dp, n) {
       ranked.forEach(ad => {
         FB.api('/' + ad.id, 'GET', {
           // Nota: `picture` fue deprecado en v19.0 y rompe toda la expansión si se incluye.
-          // Pedimos image_url SIN .width().height() para que Meta sirva el original hi-res.
           fields: 'creative{image_url,image_hash,thumbnail_url,object_story_spec,asset_feed_spec,effective_object_story_id,video_id}',
           access_token: accessToken
         }, adRes => {
@@ -1807,30 +1807,36 @@ function fetchTopAdsData(accountId, dp, n) {
             console.warn('[TopAds] creative fetch error for', ad.id, adRes.error.message);
           }
           if (adRes && !adRes.error && adRes.creative) {
-            ad.thumbnail = pickThumb(adRes.creative);
+            ad._creative       = adRes.creative;
             ad._creativeVideoId = adRes.creative.video_id || null;
             ad._creativeStoryId = adRes.creative.effective_object_story_id || null;
             ad._creativeHashes  = pickHashes(adRes.creative);
-            ad._creativeLowRes  = adRes.creative.thumbnail_url || null; // último recurso
           }
           thumbDone++;
           if (thumbDone === ranked.length) runFallbacks();
         });
       });
 
-      // Cadena de fallbacks en orden: video thumbs → image hashes → post full_picture → thumbnail_url chico
+      // Estrategia: resolver PRIMERO las fuentes de MÁXIMA calidad (videos y hashes),
+      // y sólo si no hay, caer a image_url / link_data.picture / thumbnail_url.
       function runFallbacks() {
-        // 2a) Video: pedir thumbs del video (alta resolución)
-        const videoAds = ranked.filter(a => !a.thumbnail && a._creativeVideoId);
+        // 1) Videos: /{video_id}?fields=thumbnails → frames grandes (1280x720+)
+        const videoAds = ranked.filter(a => a._creativeVideoId);
         const afterVideos = () => {
-          // 2b) Hashes de imagen: resolver vía /{accountId}/adimages
+          // 2) Hashes: batch a /{accountId}/adimages → permalink_url (ORIGINAL uploaded)
           const hashAds = ranked.filter(a => !a.thumbnail && (a._creativeHashes||[]).length);
           const afterHashes = () => {
-            // 2c) Page post: pedir full_picture del story
+            // 3) Page post: full_picture del story
             const storyAds = ranked.filter(a => !a.thumbnail && a._creativeStoryId);
             const afterStories = () => {
-              // 2d) Último recurso: el thumbnail_url chico que reservamos
-              ranked.forEach(a => { if (!a.thumbnail && a._creativeLowRes) a.thumbnail = a._creativeLowRes; });
+              // 4) Últimos recursos desde el creative que ya tenemos (image_url,
+              //    link_data.picture, asset_feed_spec, y recién al final thumbnail_url chico)
+              ranked.forEach(a => {
+                if (a.thumbnail || !a._creative) return;
+                a.thumbnail = pickThumb(a._creative) || a._creative.thumbnail_url || null;
+              });
+              // Limpieza
+              ranked.forEach(a => { delete a._creative; delete a._creativeVideoId; delete a._creativeStoryId; delete a._creativeHashes; });
               fetchPreviews(ranked, resolve);
             };
             if (!storyAds.length) return afterStories();
@@ -1842,6 +1848,7 @@ function fetchTopAdsData(accountId, dp, n) {
               }, sRes => {
                 if (sRes && !sRes.error) {
                   a.thumbnail = sRes.full_picture || sRes.picture || null;
+                  if (a.thumbnail) console.log('[TopAds] story-thumb', a.id, '→', a.thumbnail.slice(0,90));
                 }
                 sDone++;
                 if (sDone === storyAds.length) afterStories();
@@ -1849,16 +1856,18 @@ function fetchTopAdsData(accountId, dp, n) {
             });
           };
           if (!hashAds.length) return afterHashes();
-          // Juntar todos los hashes únicos en UNA sola llamada al account
           const allHashes = Array.from(new Set(hashAds.flatMap(a => a._creativeHashes)));
           FB.api('/' + accountId + '/adimages', 'GET', {
-            fields: 'hash,url,permalink_url',
+            fields: 'hash,url,permalink_url,width,height',
             hashes: JSON.stringify(allHashes),
             access_token: accessToken
           }, hRes => {
             const urlByHash = {};
             if (hRes && !hRes.error && Array.isArray(hRes.data)) {
-              hRes.data.forEach(im => { if (im && im.hash) urlByHash[im.hash] = im.permalink_url || im.url || null; });
+              hRes.data.forEach(im => {
+                if (im && im.hash) urlByHash[im.hash] = im.permalink_url || im.url || null;
+                if (im && im.hash) console.log('[TopAds] adimage', im.hash.slice(0,8), '→', (im.width||'?')+'x'+(im.height||'?'));
+              });
             } else if (hRes && hRes.error) {
               console.warn('[TopAds] adimages error:', hRes.error.message);
             }
@@ -1877,12 +1886,14 @@ function fetchTopAdsData(accountId, dp, n) {
             access_token: accessToken
           }, vRes => {
             if (vRes && !vRes.error && vRes.thumbnails && Array.isArray(vRes.thumbnails.data) && vRes.thumbnails.data.length) {
-              // Preferir el is_preferred; si no, el más grande por área
-              const thumbs = vRes.thumbnails.data.slice();
-              const pref = thumbs.find(t => t.is_preferred);
-              const biggest = thumbs.sort((x, y) => (y.width||0)*(y.height||0) - (x.width||0)*(x.height||0))[0];
-              const chosen = pref || biggest;
-              if (chosen && chosen.uri) a.thumbnail = chosen.uri;
+              // Elegimos el más grande POR ÁREA (ignoramos is_preferred porque a veces es el chico)
+              const thumbs = vRes.thumbnails.data.slice()
+                .sort((x, y) => (y.width||0)*(y.height||0) - (x.width||0)*(x.height||0));
+              const chosen = thumbs[0];
+              if (chosen && chosen.uri) {
+                a.thumbnail = chosen.uri;
+                console.log('[TopAds] video-thumb', a.id, '→', (chosen.width||'?')+'x'+(chosen.height||'?'));
+              }
             } else if (vRes && vRes.error) {
               console.warn('[TopAds] video thumbs error:', vRes.error.message);
             }
