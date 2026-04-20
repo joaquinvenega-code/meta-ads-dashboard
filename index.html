@@ -1618,7 +1618,13 @@ function renderDetail() {
         <div class="top-ads-header">
           <span class="top-ads-title">🏆 Anuncios ganadores</span>
           <div class="top-ads-controls">
-            <label style="font-size:12px;color:var(--text2)">Top</label>
+            <label style="font-size:12px;color:var(--text2)">Ordenar por</label>
+            <select id="top-ads-sort-${acc.id}" style="padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text)" onchange="loadTopAds('${acc.id}')">
+              <option value="roas" selected>ROAS</option>
+              <option value="purchases">Compras</option>
+              <option value="revenue">Facturación</option>
+            </select>
+            <label style="font-size:12px;color:var(--text2);margin-left:4px">Top</label>
             <select id="top-ads-n-${acc.id}" style="padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text)" onchange="loadTopAds('${acc.id}')">
               <option value="3">3</option>
               <option value="5" selected>5</option>
@@ -1670,11 +1676,15 @@ window._topAdsOnThumbError = function(img, adId) {
   console.log('[TopAds] img error, showing placeholder', adId);
 };
 
+const TOP_ADS_SORT_LABEL = { roas: 'ROAS', purchases: 'compras', revenue: 'facturación' };
+
 async function loadTopAds(accountId) {
   const container = document.getElementById('top-ads-content-'+accountId);
   const nSel = document.getElementById('top-ads-n-'+accountId);
+  const sortSel = document.getElementById('top-ads-sort-'+accountId);
   if (!container) return;
   const n = nSel ? parseInt(nSel.value) : 5;
+  const sortBy = sortSel ? sortSel.value : 'roas';
 
   container.style.display = 'block';
   container.innerHTML = '<div class="top-ads-loading">Cargando anuncios...</div>';
@@ -1686,7 +1696,7 @@ async function loadTopAds(accountId) {
     const sym = CURRENCY_SYMBOLS[cur] || '$';
     const dp = getDateParams('datePreset','dateFrom1','dateTo1');
 
-    const ads = await fetchTopAdsData(accountId, dp, n);
+    const ads = await fetchTopAdsData(accountId, dp, n, sortBy);
 
     if (!ads.length) {
       container.innerHTML = '<div class="top-ads-loading" style="color:var(--text3)">No se encontraron anuncios con datos en este período.</div>';
@@ -1725,7 +1735,7 @@ async function loadTopAds(accountId) {
           '</div>' +
         '</div>' +
         '<div class="ad-footer">' +
-          '<span class="ad-rank">#' + (i+1) + ' por ROAS</span>' +
+          '<span class="ad-rank">#' + (i+1) + ' por ' + (TOP_ADS_SORT_LABEL[sortBy] || 'ROAS') + '</span>' +
           previewBtn +
         '</div>' +
       '</div>';
@@ -1739,7 +1749,8 @@ async function loadTopAds(accountId) {
   }
 }
 
-function fetchTopAdsData(accountId, dp, n) {
+function fetchTopAdsData(accountId, dp, n, sortBy) {
+  sortBy = sortBy || 'roas';
   return new Promise((resolve, reject) => {
     if (!accessToken) return resolve([]);
 
@@ -1758,7 +1769,8 @@ function fetchTopAdsData(accountId, dp, n) {
         return resolve([]);
       }
 
-      // Rankear por ROAS, filtrar los que tienen gasto
+      // Rankear por el criterio pedido (ROAS por defecto), filtrar los que tienen gasto
+      const sortKey = (sortBy === 'purchases' || sortBy === 'revenue') ? sortBy : 'roas';
       const ranked = insRes.data
         .map(d => {
           const spend     = parseFloat(d.spend) || 0;
@@ -1769,7 +1781,7 @@ function fetchTopAdsData(accountId, dp, n) {
           return { id: d.ad_id, name: d.ad_name || d.ad_id, spend, purchases, revenue, ctr, roas, thumbnail: null, previewUrl: null };
         })
         .filter(a => a.spend > 0)
-        .sort((a, b) => b.roas - a.roas)
+        .sort((a, b) => (b[sortKey]||0) - (a[sortKey]||0))
         .slice(0, n);
 
       if (!ranked.length) return resolve([]);
