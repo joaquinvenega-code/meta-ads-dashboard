@@ -1669,7 +1669,9 @@ async function loadTopAds(accountId) {
       const roas = ad.spend > 0 ? ad.revenue / ad.spend : 0;
       const cpp  = ad.purchases > 0 ? ad.spend / ad.purchases : 0;
       const thumb = ad.thumbnail
-        ? '<img class="ad-thumb" src="' + ad.thumbnail + '" alt="" id="adimg-' + ad.id + '">' +
+        ? '<img class="ad-thumb" src="' + ad.thumbnail + '" alt="" id="adimg-' + ad.id + '" ' +
+          'referrerpolicy="no-referrer" loading="lazy" ' +
+          'onerror="this.style.display=\'none\';var p=document.getElementById(\'adph-' + ad.id + '\');if(p)p.style.display=\'flex\';">' +
           '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">Sin imagen</div>'
         : '<div class="ad-thumb-placeholder">Sin imagen</div>';
 
@@ -1749,17 +1751,68 @@ function fetchTopAdsData(accountId, dp, n) {
       if (!ranked.length) return resolve([]);
 
       // Paso 2: traer thumbnails para los top N
+      // Pedimos varios campos con fallback para cubrir video, DCO, link ads y carousels.
+      // thumbnail_url.width(400).height(400) nos da una miniatura grande (no 64x64).
       let thumbDone = 0;
+      const pickThumb = cr => {
+        if (!cr) return null;
+        // 1) thumbnail grande del creative
+        if (cr.thumbnail_url) return cr.thumbnail_url;
+        // 2) imagen directa (ads estáticos)
+        if (cr.image_url) return cr.image_url;
+        // 3) "picture" clásico (link ads viejos)
+        if (cr.picture) return cr.picture;
+        // 4) object_story_spec → link_data / photo_data / video_data
+        const oss = cr.object_story_spec || {};
+        if (oss.link_data && oss.link_data.picture) return oss.link_data.picture;
+        if (oss.photo_data && oss.photo_data.url) return oss.photo_data.url;
+        if (oss.video_data && oss.video_data.image_url) return oss.video_data.image_url;
+        // 5) asset_feed_spec → primer image URL (DCO / dynamic creative)
+        const afs = cr.asset_feed_spec || {};
+        if (Array.isArray(afs.images) && afs.images.length) {
+          const img = afs.images.find(i => i && i.url) || afs.images[0];
+          if (img && img.url) return img.url;
+        }
+        if (Array.isArray(afs.videos) && afs.videos.length) {
+          const v = afs.videos[0];
+          if (v && v.thumbnail_url) return v.thumbnail_url;
+        }
+        return null;
+      };
       ranked.forEach(ad => {
         FB.api('/' + ad.id, 'GET', {
-          fields: 'creative{thumbnail_url,picture}',
+          fields: 'creative{thumbnail_url.width(400).height(400),image_url,picture,object_story_spec,asset_feed_spec,effective_object_story_id,video_id}',
           access_token: accessToken
         }, adRes => {
+          if (adRes && adRes.error) {
+            console.warn('[TopAds] creative fetch error for', ad.id, adRes.error.message);
+          }
           if (adRes && !adRes.error && adRes.creative) {
-            ad.thumbnail = adRes.creative.thumbnail_url || adRes.creative.picture || null;
+            ad.thumbnail = pickThumb(adRes.creative);
+            ad._creativeVideoId = adRes.creative.video_id || null;
+            ad._creativeStoryId = adRes.creative.effective_object_story_id || null;
           }
           thumbDone++;
-          if (thumbDone === ranked.length) fetchPreviews(ranked, resolve);
+          if (thumbDone === ranked.length) {
+            // Paso 2b: para los ads que siguen sin thumbnail pero tienen video_id,
+            // intentamos un último fallback pidiendo /{video_id}?fields=thumbnails
+            const pending = ranked.filter(a => !a.thumbnail && a._creativeVideoId);
+            if (!pending.length) return fetchPreviews(ranked, resolve);
+            let vDone = 0;
+            pending.forEach(ad => {
+              FB.api('/' + ad._creativeVideoId, 'GET', {
+                fields: 'thumbnails{uri,is_preferred}',
+                access_token: accessToken
+              }, vRes => {
+                if (vRes && !vRes.error && vRes.thumbnails && Array.isArray(vRes.thumbnails.data) && vRes.thumbnails.data.length) {
+                  const pref = vRes.thumbnails.data.find(t => t.is_preferred) || vRes.thumbnails.data[0];
+                  if (pref && pref.uri) ad.thumbnail = pref.uri;
+                }
+                vDone++;
+                if (vDone === pending.length) fetchPreviews(ranked, resolve);
+              });
+            });
+          }
         });
       });
     });
