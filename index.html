@@ -174,8 +174,6 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .ad-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
 .ad-thumb{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bg3);display:block}
 .ad-thumb-placeholder{width:100%;aspect-ratio:1;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
-.ad-thumb-iframe-wrap{width:100%;aspect-ratio:1;background:var(--bg3);overflow:hidden;position:relative}
-.ad-thumb-iframe{position:absolute;top:50%;left:50%;width:540px;height:540px;border:0;transform:translate(-50%,-50%) scale(0.42);transform-origin:center center;pointer-events:none}
 .ad-body{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:6px}
 .ad-name{font-size:11px;font-weight:600;color:var(--text);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .ad-metrics{display:grid;grid-template-columns:1fr 1fr;gap:4px}
@@ -1652,29 +1650,25 @@ function toggleDetail(id) {
 // TOP ADS
 // ══════════════════════════════════════
 // Helpers globales para las miniaturas (referenciados desde onload/onerror inline).
-// Umbral: si la imagen natural es < 400px de ancho, la consideramos "baja calidad"
-// y hacemos swap al iframe del preview (que SÍ renderiza el creativo real).
-window._topAdsSwapToIframe = function(img, adId, reason) {
-  img.style.display = 'none';
-  const ph = document.getElementById('adph-' + adId);
-  if (ph) {
-    // El placeholder contiene el iframe del preview; lo mostramos como block
-    // para que el iframe-wrap interior ocupe 100% (aspect-ratio 1).
-    ph.style.display = 'block';
-    ph.style.padding = '0';
-    ph.style.background = 'transparent';
-  }
-  console.log('[TopAds] swap→iframe', adId, reason || '');
-};
+// NOTA: NO usamos iframe como fallback porque es interactivo (videos se reproducen)
+// y no se puede exportar a PDF. Preferimos imagen estática aunque sea low-res.
 window._topAdsOnThumbLoad = function(img, adId) {
   const w = img.naturalWidth || 0, h = img.naturalHeight || 0;
   console.log('[TopAds] thumb OK', adId, w + 'x' + h, (img.src||'').slice(0,90));
-  if (w < 400 || h < 400) {
-    window._topAdsSwapToIframe(img, adId, 'low-res ' + w + 'x' + h);
+  // Si la imagen es muy chica (≤128px), aplicamos filtros para suavizar el pixelado
+  // y un fondo para que no se vea estirada horriblemente. Sigue siendo estática.
+  if (w <= 128 || h <= 128) {
+    img.style.imageRendering = 'auto';
+    img.style.filter = 'blur(1px)';
+    img.style.objectFit = 'cover';
+    console.log('[TopAds] low-res styling applied', adId);
   }
 };
 window._topAdsOnThumbError = function(img, adId) {
-  window._topAdsSwapToIframe(img, adId, 'img error');
+  img.style.display = 'none';
+  const ph = document.getElementById('adph-' + adId);
+  if (ph) ph.style.display = 'flex';
+  console.log('[TopAds] img error, showing placeholder', adId);
 };
 
 async function loadTopAds(accountId) {
@@ -1703,20 +1697,16 @@ async function loadTopAds(accountId) {
     const cards = ads.map((ad, i) => {
       const roas = ad.spend > 0 ? ad.revenue / ad.spend : 0;
       const cpp  = ad.purchases > 0 ? ad.spend / ad.purchases : 0;
-      // Fallback visual final: si no hay thumbnail, embedemos el preview iframe
-      // (que SÍ renderiza el creativo real, incluidos videos sin hash/permisos).
-      const iframePreview = ad.previewUrl
-        ? '<div class="ad-thumb-iframe-wrap" id="adpf-' + ad.id + '">' +
-            '<iframe class="ad-thumb-iframe" src="' + ad.previewUrl + '" scrolling="no" frameborder="0" loading="lazy" referrerpolicy="no-referrer"></iframe>' +
-          '</div>'
-        : '<div class="ad-thumb-placeholder">Sin imagen</div>';
+      // Fallback: si no hay thumbnail, mostramos placeholder estático
+      // (NO usamos iframe porque es interactivo / videos auto-play, y
+      // necesitamos algo estático para exportar a PDF más adelante).
       const thumb = ad.thumbnail
         ? '<img class="ad-thumb" src="' + ad.thumbnail + '" alt="" id="adimg-' + ad.id + '" ' +
           'referrerpolicy="no-referrer" loading="lazy" ' +
           'onload="window._topAdsOnThumbLoad(this,\'' + ad.id + '\')" ' +
           'onerror="window._topAdsOnThumbError(this,\'' + ad.id + '\')">' +
-          '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">' + iframePreview + '</div>'
-        : iframePreview;
+          '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">Sin imagen</div>'
+        : '<div class="ad-thumb-placeholder">Sin imagen</div>';
 
       const previewBtn = ad.previewUrl
         ? '<a class="ad-preview-link" href="' + ad.previewUrl + '" target="_blank" rel="noopener">↗ Ver anuncio</a>'
@@ -1868,25 +1858,64 @@ function fetchTopAdsData(accountId, dp, n) {
           // 2) Page post: full_picture del story (para videos y ads orgánicos boosted)
           const storyAds = ranked.filter(a => !a.thumbnail && a._creativeStoryId);
           const afterStories = () => {
-            // 3) Desde el creative que ya tenemos: image_url, link_data.picture,
-            //    video_data.image_url, asset_feed_spec, y recién al final thumbnail_url chico.
-            ranked.forEach(a => {
-              if (a.thumbnail || !a._creative) return;
-              a.thumbnail = pickThumb(a._creative);
-              if (a.thumbnail) console.log('[TopAds] creative-fb', a.id, '→', a.thumbnail.slice(0,90));
+            // 2.5) Videos sin hash/story resueltos: pedir picture del /{video_id}.
+            //      El field `picture` en el nodo video NO requiere Advanced Access
+            //      (a diferencia de `thumbnails` que sí). `format` suele devolver
+            //      varias resoluciones. Es nuestra mejor chance para reels/videos.
+            const videoAds = ranked.filter(a => !a.thumbnail && a._creativeVideoId);
+            const afterVideos = () => {
+              // 3) Desde el creative que ya tenemos: image_url, link_data.picture,
+              //    video_data.image_url, asset_feed_spec, y recién al final thumbnail_url chico.
+              ranked.forEach(a => {
+                if (a.thumbnail || !a._creative) return;
+                a.thumbnail = pickThumb(a._creative);
+                if (a.thumbnail) console.log('[TopAds] creative-fb', a.id, '→', a.thumbnail.slice(0,90));
+              });
+              // 4) Último recurso estático: thumbnail_url (pedido a 600×600, suele
+              //    quedarse en 64×64 igual pero es ESTÁTICO — mejor eso que iframe live).
+              ranked.forEach(a => {
+                if (a.thumbnail || !a._creative) return;
+                if (a._creative.thumbnail_url) {
+                  a.thumbnail = a._creative.thumbnail_url;
+                  console.log('[TopAds] thumbnail_url fallback for', a.id);
+                }
+              });
+              // Limpieza
+              ranked.forEach(a => { delete a._creative; delete a._creativeVideoId; delete a._creativeStoryId; delete a._creativeHashes; });
+              fetchPreviews(ranked, resolve);
+            };
+            if (!videoAds.length) return afterVideos();
+            let vDone = 0;
+            videoAds.forEach(a => {
+              FB.api('/' + a._creativeVideoId, 'GET', {
+                fields: 'picture,format',
+                access_token: accessToken
+              }, vRes => {
+                if (vRes && !vRes.error) {
+                  // `format` es un array con distintas resoluciones; elegimos la más grande.
+                  let best = null;
+                  if (Array.isArray(vRes.format)) {
+                    vRes.format.forEach(f => {
+                      const area = (f.width||0) * (f.height||0);
+                      if (f.picture && (!best || area > best._area)) {
+                        best = { src: f.picture, _area: area, w: f.width, h: f.height };
+                      }
+                    });
+                  }
+                  if (best && best.src) {
+                    a.thumbnail = best.src;
+                    console.log('[TopAds] video-format', a.id, '→', (best.w||'?')+'x'+(best.h||'?'));
+                  } else if (vRes.picture) {
+                    a.thumbnail = vRes.picture;
+                    console.log('[TopAds] video-picture', a.id, '→', a.thumbnail.slice(0,90));
+                  }
+                } else if (vRes && vRes.error) {
+                  console.warn('[TopAds] video fetch error for', a.id, '→', vRes.error.message);
+                }
+                vDone++;
+                if (vDone === videoAds.length) afterVideos();
+              });
             });
-            // 4) Penúltimo recurso: thumbnail_url (ahora pedido a 600×600, no 64×64).
-            //    Si no hay nada mejor, al menos es decente.
-            ranked.forEach(a => {
-              if (a.thumbnail || !a._creative) return;
-              if (a._creative.thumbnail_url) {
-                a.thumbnail = a._creative.thumbnail_url;
-                console.log('[TopAds] thumbnail_url 600px fallback for', a.id);
-              }
-            });
-            // Limpieza
-            ranked.forEach(a => { delete a._creative; delete a._creativeVideoId; delete a._creativeStoryId; delete a._creativeHashes; });
-            fetchPreviews(ranked, resolve);
           };
           if (!storyAds.length) return afterStories();
           let sDone = 0;
