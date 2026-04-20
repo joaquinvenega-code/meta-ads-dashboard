@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control ROAS — Meta Ads Dashboard</title>
+<title>Control ROAS — Dashboard interno de métricas publicitarias</title>
+<meta name="description" content="Herramienta interna para equipos de marketing que permite visualizar el rendimiento de sus propias cuentas publicitarias vía API oficial. No afiliada a Meta Platforms Inc., Facebook ni Instagram.">
+<meta name="robots" content="noindex,nofollow">
+<meta name="author" content="Uso privado — agencia interna">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -241,22 +244,26 @@ tr:hover .row-actions{opacity:1}
     <button class="btn btn-sm" onclick="cancelAutoLogin()" style="margin-top:8px;font-size:12px;color:var(--text3)">Cancelar y volver al login</button>
   </div>
   <div class="config-hero">
-    <div style="width:56px;height:56px;background:var(--blue);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+    <div style="width:56px;height:56px;background:#111;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
     </div>
     <h1>Control ROAS</h1>
-    <p>Dashboard de Meta Ads para tu agencia</p>
+    <p>Dashboard interno de métricas publicitarias</p>
+    <p style="font-size:11px;color:var(--text3);margin-top:6px">Uso privado del equipo · No afiliado a Meta Platforms Inc.</p>
   </div>
   <div class="card">
-    <h3>Conectar con Meta</h3>
-    <input class="inp" id="appIdInput" placeholder="App ID de Meta (ej: 1234567890123456)" style="margin-bottom:12px">
+    <h3>Conectar tus cuentas publicitarias</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">
+      Esta herramienta usa el <strong>SDK oficial de Facebook Login (OAuth)</strong> para leer las métricas de <em>tus propias</em> cuentas de Meta Ads vía la Marketing API de Meta. El inicio de sesión se hace en el dominio oficial de Facebook; este sitio nunca recibe ni almacena tu contraseña.
+    </p>
+    <input class="inp" id="appIdInput" placeholder="ID de tu propia app de Meta (ej: 1234567890123456)" style="margin-bottom:12px">
     <p id="savedAppIdNote" style="font-size:11px;color:var(--green);margin-bottom:8px;display:none">✓ App ID guardado — intentando reconectar...</p>
     <div id="alertMsg" class="alert alert-err"></div>
     <button class="btn-fb" onclick="initFBLogin()">
       <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-      Continuar con Facebook
+      Iniciar sesión con Facebook (OAuth oficial)
     </button>
-    <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">Autenticación oficial — nunca almacenamos tu token</p>
+    <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">Autenticación vía SDK oficial de Meta · Sólo lectura de métricas · Nunca se almacenan credenciales</p>
     <div id="alertMsg" class="alert alert-err" style="margin-top:10px"></div>
   </div>
   <div class="card">
@@ -272,12 +279,12 @@ tr:hover .row-actions{opacity:1}
 <!-- ══ PIN SCREEN (readonly) ══ -->
 <div id="pinScreen">
   <div style="width:48px;height:48px;background:var(--amber-bg);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
   </div>
-  <h2>Acceso de visualización</h2>
-  <p>Ingresá el PIN para ver el dashboard</p>
-  <input class="pin-input inp" id="pinInput" type="password" maxlength="6" placeholder="••••••" oninput="checkPin()">
-  <div id="pinError" style="font-size:12px;color:var(--red);margin-top:4px;display:none">PIN incorrecto</div>
+  <h2>Código de acceso del equipo</h2>
+  <p style="font-size:13px;color:var(--text2);line-height:1.5">Ingresá el código numérico interno para ver el tablero compartido.<br><strong style="color:var(--text)">Esto NO es una contraseña de Facebook, Google ni ningún servicio externo.</strong> Es un código corto definido por el administrador del equipo para compartir vistas de sólo lectura.</p>
+  <input class="pin-input inp" id="pinInput" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="••••••" oninput="checkPin()" aria-label="Código numérico interno del equipo" style="margin-top:16px">
+  <div id="pinError" style="font-size:12px;color:var(--red);margin-top:4px;display:none">Código incorrecto</div>
 </div>
 
 <!-- ══ MAIN APP ══ -->
@@ -1791,6 +1798,9 @@ function fetchTopAdsData(accountId, dp, n) {
         const oss = cr.object_story_spec || {};
         if (oss.link_data && oss.link_data.image_hash) hashes.push(oss.link_data.image_hash);
         if (oss.photo_data && oss.photo_data.image_hash) hashes.push(oss.photo_data.image_hash);
+        // Videos: el cover custom suele estar acá. Es lo que salva a los videos
+        // cuando /{video_id}/thumbnails falla por permisos.
+        if (oss.video_data && oss.video_data.image_hash) hashes.push(oss.video_data.image_hash);
         const afs = cr.asset_feed_spec || {};
         if (Array.isArray(afs.images)) {
           afs.images.forEach(i => { if (i && i.hash) hashes.push(i.hash); });
@@ -1817,89 +1827,78 @@ function fetchTopAdsData(accountId, dp, n) {
         });
       });
 
-      // Estrategia: resolver PRIMERO las fuentes de MÁXIMA calidad (videos y hashes),
-      // y sólo si no hay, caer a image_url / link_data.picture / thumbnail_url.
+      // Estrategia: resolver PRIMERO hashes (fuente ORIGINAL uploaded), después story
+      // full_picture, después lo que esté en el creative. thumbnail_url 64x64 es último recurso.
+      // Nota: /{video_id}?fields=thumbnails requiere permisos Advanced Access que la mayoría
+      // de apps no tienen (#10). NO lo llamamos; los videos se resuelven por image_hash o story.
       function runFallbacks() {
-        // 1) Videos: /{video_id}?fields=thumbnails → frames grandes (1280x720+)
-        const videoAds = ranked.filter(a => a._creativeVideoId);
-        const afterVideos = () => {
-          // 2) Hashes: batch a /{accountId}/adimages → permalink_url (ORIGINAL uploaded)
-          const hashAds = ranked.filter(a => !a.thumbnail && (a._creativeHashes||[]).length);
-          const afterHashes = () => {
-            // 3) Page post: full_picture del story
-            const storyAds = ranked.filter(a => !a.thumbnail && a._creativeStoryId);
-            const afterStories = () => {
-              // 4) Últimos recursos desde el creative que ya tenemos (image_url,
-              //    link_data.picture, asset_feed_spec, y recién al final thumbnail_url chico)
-              ranked.forEach(a => {
-                if (a.thumbnail || !a._creative) return;
-                a.thumbnail = pickThumb(a._creative) || a._creative.thumbnail_url || null;
-              });
-              // Limpieza
-              ranked.forEach(a => { delete a._creative; delete a._creativeVideoId; delete a._creativeStoryId; delete a._creativeHashes; });
-              fetchPreviews(ranked, resolve);
-            };
-            if (!storyAds.length) return afterStories();
-            let sDone = 0;
-            storyAds.forEach(a => {
-              FB.api('/' + a._creativeStoryId, 'GET', {
-                fields: 'full_picture,picture',
-                access_token: accessToken
-              }, sRes => {
-                if (sRes && !sRes.error) {
-                  a.thumbnail = sRes.full_picture || sRes.picture || null;
-                  if (a.thumbnail) console.log('[TopAds] story-thumb', a.id, '→', a.thumbnail.slice(0,90));
-                }
-                sDone++;
-                if (sDone === storyAds.length) afterStories();
-              });
+        // 1) Hashes: batch a /{accountId}/adimages → permalink_url (ORIGINAL uploaded).
+        //    Esto cubre imágenes estáticas Y el cover custom de videos.
+        const hashAds = ranked.filter(a => (a._creativeHashes||[]).length);
+        const afterHashes = () => {
+          // 2) Page post: full_picture del story (para videos y ads orgánicos boosted)
+          const storyAds = ranked.filter(a => !a.thumbnail && a._creativeStoryId);
+          const afterStories = () => {
+            // 3) Desde el creative que ya tenemos: image_url, link_data.picture,
+            //    video_data.image_url, asset_feed_spec, y recién al final thumbnail_url chico.
+            ranked.forEach(a => {
+              if (a.thumbnail || !a._creative) return;
+              a.thumbnail = pickThumb(a._creative);
+              if (a.thumbnail) console.log('[TopAds] creative-fb', a.id, '→', a.thumbnail.slice(0,90));
             });
+            // 4) Último recurso: el 64x64 feo, pero al menos no deja vacío
+            ranked.forEach(a => {
+              if (a.thumbnail || !a._creative) return;
+              if (a._creative.thumbnail_url) {
+                a.thumbnail = a._creative.thumbnail_url;
+                console.warn('[TopAds] LOW-RES fallback for', a.id, '→ 64x64 thumbnail_url (no hay alternativa)');
+              }
+            });
+            // Limpieza
+            ranked.forEach(a => { delete a._creative; delete a._creativeVideoId; delete a._creativeStoryId; delete a._creativeHashes; });
+            fetchPreviews(ranked, resolve);
           };
-          if (!hashAds.length) return afterHashes();
-          const allHashes = Array.from(new Set(hashAds.flatMap(a => a._creativeHashes)));
-          FB.api('/' + accountId + '/adimages', 'GET', {
-            fields: 'hash,url,permalink_url,width,height',
-            hashes: JSON.stringify(allHashes),
-            access_token: accessToken
-          }, hRes => {
-            const urlByHash = {};
-            if (hRes && !hRes.error && Array.isArray(hRes.data)) {
-              hRes.data.forEach(im => {
-                if (im && im.hash) urlByHash[im.hash] = im.permalink_url || im.url || null;
-                if (im && im.hash) console.log('[TopAds] adimage', im.hash.slice(0,8), '→', (im.width||'?')+'x'+(im.height||'?'));
-              });
-            } else if (hRes && hRes.error) {
-              console.warn('[TopAds] adimages error:', hRes.error.message);
-            }
-            hashAds.forEach(a => {
-              const h = (a._creativeHashes||[]).find(hh => urlByHash[hh]);
-              if (h) a.thumbnail = urlByHash[h];
+          if (!storyAds.length) return afterStories();
+          let sDone = 0;
+          storyAds.forEach(a => {
+            FB.api('/' + a._creativeStoryId, 'GET', {
+              fields: 'full_picture,picture',
+              access_token: accessToken
+            }, sRes => {
+              if (sRes && !sRes.error) {
+                a.thumbnail = sRes.full_picture || sRes.picture || null;
+                if (a.thumbnail) console.log('[TopAds] story-thumb', a.id, '→', a.thumbnail.slice(0,90));
+              } else if (sRes && sRes.error) {
+                console.warn('[TopAds] story fetch error:', sRes.error.message);
+              }
+              sDone++;
+              if (sDone === storyAds.length) afterStories();
             });
-            afterHashes();
           });
         };
-        if (!videoAds.length) return afterVideos();
-        let vDone = 0;
-        videoAds.forEach(a => {
-          FB.api('/' + a._creativeVideoId, 'GET', {
-            fields: 'thumbnails{uri,is_preferred,width,height}',
-            access_token: accessToken
-          }, vRes => {
-            if (vRes && !vRes.error && vRes.thumbnails && Array.isArray(vRes.thumbnails.data) && vRes.thumbnails.data.length) {
-              // Elegimos el más grande POR ÁREA (ignoramos is_preferred porque a veces es el chico)
-              const thumbs = vRes.thumbnails.data.slice()
-                .sort((x, y) => (y.width||0)*(y.height||0) - (x.width||0)*(x.height||0));
-              const chosen = thumbs[0];
-              if (chosen && chosen.uri) {
-                a.thumbnail = chosen.uri;
-                console.log('[TopAds] video-thumb', a.id, '→', (chosen.width||'?')+'x'+(chosen.height||'?'));
+        if (!hashAds.length) return afterHashes();
+        const allHashes = Array.from(new Set(hashAds.flatMap(a => a._creativeHashes)));
+        FB.api('/' + accountId + '/adimages', 'GET', {
+          fields: 'hash,url,permalink_url,width,height',
+          hashes: JSON.stringify(allHashes),
+          access_token: accessToken
+        }, hRes => {
+          const urlByHash = {};
+          if (hRes && !hRes.error && Array.isArray(hRes.data)) {
+            hRes.data.forEach(im => {
+              if (im && im.hash) {
+                urlByHash[im.hash] = im.permalink_url || im.url || null;
+                console.log('[TopAds] adimage', im.hash.slice(0,8), '→', (im.width||'?')+'x'+(im.height||'?'));
               }
-            } else if (vRes && vRes.error) {
-              console.warn('[TopAds] video thumbs error:', vRes.error.message);
-            }
-            vDone++;
-            if (vDone === videoAds.length) afterVideos();
+            });
+          } else if (hRes && hRes.error) {
+            console.warn('[TopAds] adimages error:', hRes.error.message);
+          }
+          hashAds.forEach(a => {
+            const h = (a._creativeHashes||[]).find(hh => urlByHash[hh]);
+            if (h) a.thumbnail = urlByHash[h];
           });
+          afterHashes();
         });
       }
     });
@@ -2887,5 +2886,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+
+<!-- Disclaimer visible en el pie de página (requerido por guidelines de Meta + mitigación de falsos positivos de phishing) -->
+<footer style="max-width:900px;margin:40px auto 24px;padding:20px 24px;border-top:0.5px solid rgba(0,0,0,0.08);text-align:center;font-size:11px;color:#9b9b96;line-height:1.6">
+  <p><strong>Control ROAS</strong> es una herramienta interna de visualización para equipos de marketing. Permite a cada usuario consultar el rendimiento de <em>sus propias</em> cuentas publicitarias vía la Marketing API oficial de Meta.</p>
+  <p style="margin-top:6px">Este sitio <strong>NO está afiliado, asociado, autorizado, respaldado por, ni conectado oficialmente con Meta Platforms Inc., Facebook, Instagram ni WhatsApp</strong>. "Meta", "Facebook" e "Instagram" son marcas registradas de Meta Platforms Inc. El inicio de sesión se realiza exclusivamente a través del SDK oficial de Facebook Login, en el dominio <code>facebook.com</code>. Este sitio nunca solicita ni almacena contraseñas de terceros.</p>
+</footer>
 </body>
 </html>
