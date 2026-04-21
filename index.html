@@ -170,10 +170,35 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .top-ads-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 .top-ads-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
 .top-ads-controls{display:flex;align-items:center;gap:8px}
-.top-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
-.ad-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
-.ad-thumb{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bg3);display:block}
-.ad-thumb-placeholder{width:100%;aspect-ratio:1;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
+.top-ads-list{display:flex;flex-direction:column;gap:10px}
+.ad-card-h{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;align-items:stretch;gap:12px;padding:10px}
+.ad-thumb-box{flex:0 0 140px;width:140px;height:140px;border-radius:var(--radius);overflow:hidden;background:var(--bg3);position:relative}
+.ad-thumb{width:100%;height:100%;object-fit:cover;background:var(--bg3);display:block}
+.ad-thumb-placeholder{width:100%;height:100%;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
+.ad-metrics-box{flex:0 0 200px;width:200px;background:var(--bg2);border-radius:var(--radius);padding:8px;display:flex;flex-direction:column;gap:4px}
+.ad-metrics-h-title{font-size:12px;font-weight:700;color:var(--text);padding:2px 4px 6px;border-bottom:0.5px solid var(--border);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ad-metrics-h-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ad-metric-h{background:var(--bg);border:0.5px solid var(--border);border-radius:6px;padding:5px 7px}
+.ad-metric-h .ml{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:1px}
+.ad-metric-h .mv{font-size:12px;font-weight:700;color:var(--text)}
+.ad-chart-box{flex:1 1 auto;min-width:260px;background:var(--bg2);border-radius:var(--radius);padding:8px 10px 4px;position:relative;overflow:hidden}
+.ad-chart-legend{display:flex;gap:10px;align-items:center;font-size:10px;margin-bottom:2px}
+.ad-chart-legend-item{display:flex;align-items:center;gap:4px;color:var(--text2)}
+.ad-chart-legend-dot{width:8px;height:8px;border-radius:50%}
+.ad-chart-svg{width:100%;height:110px;display:block}
+.ad-chart-empty{display:flex;align-items:center;justify-content:center;height:110px;color:var(--text3);font-size:11px}
+.ad-preview-box{flex:0 0 70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;color:var(--text2);font-size:11px;border-left:0.5px solid var(--border);padding:0 4px}
+.ad-preview-box:hover{color:var(--blue)}
+.ad-preview-icon{width:32px;height:32px;border:0.5px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--bg)}
+.ad-preview-box:hover .ad-preview-icon{background:var(--blue-bg);border-color:var(--blue);color:var(--blue)}
+.ad-rank-badge{position:absolute;top:4px;left:4px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;z-index:1}
+@media (max-width: 900px){
+  .ad-card-h{flex-wrap:wrap}
+  .ad-thumb-box{flex:0 0 100px;width:100px;height:100px}
+  .ad-metrics-box{flex:1 1 200px;width:auto}
+  .ad-chart-box{flex:1 1 100%;min-width:0}
+  .ad-preview-box{flex:0 0 auto;border-left:0;border-top:0.5px solid var(--border);flex-direction:row;padding-top:6px;width:100%;justify-content:center}
+}
 .ad-body{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:6px}
 .ad-name{font-size:11px;font-weight:600;color:var(--text);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .ad-metrics{display:grid;grid-template-columns:1fr 1fr;gap:4px}
@@ -1761,13 +1786,17 @@ async function loadTopAds(accountId) {
       return;
     }
 
+    // Traer series diarias para el mini-gráfico
+    const dailyByAd = await fetchDailySeries(accountId, dp, ads.map(a => a.id));
+    ads.forEach(a => { a.dailySeries = dailyByAd[a.id] || []; });
+
+    const sortLabel = TOP_ADS_SORT_LABEL[sortBy] || 'ROAS';
+
     const cards = ads.map((ad, i) => {
       const roas = ad.spend > 0 ? ad.revenue / ad.spend : 0;
       const cpp  = ad.purchases > 0 ? ad.spend / ad.purchases : 0;
-      // Fallback: si no hay thumbnail, mostramos placeholder estático
-      // (NO usamos iframe porque es interactivo / videos auto-play, y
-      // necesitamos algo estático para exportar a PDF más adelante).
-      const thumb = ad.thumbnail
+
+      const thumbInner = ad.thumbnail
         ? '<img class="ad-thumb" src="' + ad.thumbnail + '" alt="" id="adimg-' + ad.id + '" ' +
           'referrerpolicy="no-referrer" loading="lazy" ' +
           'onload="window._topAdsOnThumbLoad(this,\'' + ad.id + '\')" ' +
@@ -1775,31 +1804,41 @@ async function loadTopAds(accountId) {
           '<div class="ad-thumb-placeholder" id="adph-' + ad.id + '" style="display:none">Sin imagen</div>'
         : '<div class="ad-thumb-placeholder">Sin imagen</div>';
 
-      const previewBtn = ad.previewUrl
-        ? '<a class="ad-preview-link" href="' + ad.previewUrl + '" target="_blank" rel="noopener">↗ Ver anuncio</a>'
-        : '<span style="font-size:11px;color:var(--text3)">Sin preview</span>';
+      const thumbBox =
+        '<div class="ad-thumb-box">' +
+          '<span class="ad-rank-badge">#' + (i+1) + ' · ' + sortLabel + '</span>' +
+          thumbInner +
+        '</div>';
 
-      return '<div class="ad-card">' +
-        thumb +
-        '<div class="ad-body">' +
-          '<div class="ad-name" title="' + (ad.name||'').replace(/"/g,"'") + '">' + (ad.name || 'Sin nombre') + '</div>' +
-          '<div class="ad-metrics">' +
-            '<div class="ad-metric"><div class="ad-metric-label">ROAS</div><div class="ad-metric-value ad-roas">×' + fmtDec(roas) + '</div></div>' +
-            '<div class="ad-metric"><div class="ad-metric-label">CTR</div><div class="ad-metric-value">' + fmtDec(ad.ctr, 2) + '%</div></div>' +
-            '<div class="ad-metric"><div class="ad-metric-label">Invertido</div><div class="ad-metric-value">' + sym + fmtN(Math.round(ad.spend)) + '</div></div>' +
-            '<div class="ad-metric"><div class="ad-metric-label">Compras</div><div class="ad-metric-value">' + fmtN(ad.purchases) + '</div></div>' +
-            '<div class="ad-metric"><div class="ad-metric-label">Valor conv.</div><div class="ad-metric-value">' + sym + fmtN(Math.round(ad.revenue)) + '</div></div>' +
-            '<div class="ad-metric"><div class="ad-metric-label">Costo/compra</div><div class="ad-metric-value">' + (cpp > 0 ? sym + fmtDec(cpp, 2) : '—') + '</div></div>' +
+      const metricsBox =
+        '<div class="ad-metrics-box">' +
+          '<div class="ad-metrics-h-title" title="' + (ad.name||'').replace(/"/g,"'") + '">' + (ad.name || 'Sin nombre') + '</div>' +
+          '<div class="ad-metrics-h-grid">' +
+            '<div class="ad-metric-h"><div class="ml">ROAS</div><div class="mv" style="color:var(--green)">×' + fmtDec(roas) + '</div></div>' +
+            '<div class="ad-metric-h"><div class="ml">CTR</div><div class="mv">' + fmtDec(ad.ctr, 2) + '%</div></div>' +
+            '<div class="ad-metric-h"><div class="ml">Invertido</div><div class="mv">' + sym + fmtN(Math.round(ad.spend)) + '</div></div>' +
+            '<div class="ad-metric-h"><div class="ml">Compras</div><div class="mv">' + fmtN(ad.purchases) + '</div></div>' +
+            '<div class="ad-metric-h"><div class="ml">Valor conv.</div><div class="mv">' + sym + fmtN(Math.round(ad.revenue)) + '</div></div>' +
+            '<div class="ad-metric-h"><div class="ml">Costo/compra</div><div class="mv">' + (cpp > 0 ? sym + fmtDec(cpp, 2) : '—') + '</div></div>' +
           '</div>' +
-        '</div>' +
-        '<div class="ad-footer">' +
-          '<span class="ad-rank">#' + (i+1) + ' por ' + (TOP_ADS_SORT_LABEL[sortBy] || 'ROAS') + '</span>' +
-          previewBtn +
-        '</div>' +
-      '</div>';
+        '</div>';
+
+      const chartBox = '<div class="ad-chart-box">' + buildAdChartSvg(ad.dailySeries, sym) + '</div>';
+
+      const previewBox = ad.previewUrl
+        ? '<a class="ad-preview-box" href="' + ad.previewUrl + '" target="_blank" rel="noopener" title="Ver anuncio en Meta">' +
+            '<div class="ad-preview-icon">↗</div>' +
+            '<span>Ver<br>anuncio</span>' +
+          '</a>'
+        : '<div class="ad-preview-box" style="cursor:default;opacity:.4">' +
+            '<div class="ad-preview-icon">—</div>' +
+            '<span>Sin<br>preview</span>' +
+          '</div>';
+
+      return '<div class="ad-card-h">' + thumbBox + metricsBox + chartBox + previewBox + '</div>';
     }).join('');
 
-    container.innerHTML = '<div class="top-ads-grid">' + cards + '</div>';
+    container.innerHTML = '<div class="top-ads-list">' + cards + '</div>';
 
   } catch(e) {
     console.error('[TopAds]', e);
@@ -2071,6 +2110,113 @@ function fetchPreviews(ranked, resolve) {
       if (done === ranked.length) resolve(ranked);
     });
   });
+}
+
+// Trae series diarias (time_increment=1) SÓLO para los ad_ids del top N,
+// filtrando server-side para no traer toda la cuenta.
+function fetchDailySeries(accountId, dp, adIds) {
+  return new Promise(resolve => {
+    if (!accessToken || !adIds || !adIds.length) return resolve({});
+    const ga = (arr, type) => { const f = (arr||[]).find(a => a.action_type === type); return f ? parseFloat(f.value) : 0; };
+    FB.api('/' + accountId + '/insights', 'GET', {
+      fields: 'ad_id,date_start,spend,actions,action_values',
+      time_range: JSON.stringify(dp),
+      level: 'ad',
+      time_increment: 1,
+      filtering: JSON.stringify([{ field: 'ad.id', operator: 'IN', value: adIds }]),
+      limit: 1000,
+      access_token: accessToken
+    }, res => {
+      const byAd = {};
+      if (res && !res.error && Array.isArray(res.data)) {
+        res.data.forEach(d => {
+          const spend     = parseFloat(d.spend) || 0;
+          const purchases = ga(d.actions, 'purchase') || ga(d.actions, 'offsite_conversion.fb_pixel_purchase');
+          const revenue   = ga(d.action_values, 'purchase') || ga(d.action_values, 'offsite_conversion.fb_pixel_purchase');
+          const roas      = spend > 0 ? revenue / spend : 0;
+          const adId = d.ad_id;
+          if (!byAd[adId]) byAd[adId] = [];
+          byAd[adId].push({ date: d.date_start, spend, purchases, revenue, roas });
+        });
+        Object.keys(byAd).forEach(k => byAd[k].sort((a,b) => a.date.localeCompare(b.date)));
+        console.log('[TopAds] daily series OK for', Object.keys(byAd).length, 'ads');
+      } else if (res && res.error) {
+        console.warn('[TopAds] daily series error:', res.error.message);
+      }
+      resolve(byAd);
+    });
+  });
+}
+
+// Construye el SVG del mini-gráfico. 3 series normalizadas independientemente
+// (Compras, Facturación, ROAS) para que convivan en el mismo plot area.
+// El max de cada serie se muestra en la leyenda.
+function buildAdChartSvg(series, sym) {
+  if (!series || series.length < 2) {
+    return '<div class="ad-chart-empty">Sin datos suficientes para graficar</div>';
+  }
+  const W = 340, H = 110, PL = 8, PR = 8, PT = 6, PB = 22;
+  const plotW = W - PL - PR, plotH = H - PT - PB;
+  const n = series.length;
+  const xFor = i => PL + (n === 1 ? plotW/2 : (i/(n-1))*plotW);
+
+  const maxPurch = Math.max(1, ...series.map(d => d.purchases));
+  const maxRev   = Math.max(1, ...series.map(d => d.revenue));
+  const maxRoas  = Math.max(0.01, ...series.map(d => d.roas));
+
+  const yPurch = v => PT + plotH - (v / maxPurch) * plotH;
+  const yRev   = v => PT + plotH - (v / maxRev)   * plotH;
+  const yRoas  = v => PT + plotH - (v / maxRoas)  * plotH;
+
+  const linePath = (yFn) => series.map((d,i) => {
+    const x = xFor(i), y = yFn(d[d._k || 0]);
+    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+
+  // Paths manuales (no podemos usar d._k porque d no tiene esa prop)
+  const pathPurch = series.map((d,i) => { const x=xFor(i),y=yPurch(d.purchases);return (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+  const pathRev   = series.map((d,i) => { const x=xFor(i),y=yRev(d.revenue);  return (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+  const pathRoas  = series.map((d,i) => { const x=xFor(i),y=yRoas(d.roas);    return (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+
+  // Gridlines horizontales (3)
+  const gridLines = [0.25, 0.5, 0.75].map(f => {
+    const y = PT + plotH * f;
+    return `<line x1="${PL}" x2="${PL+plotW}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,3"/>`;
+  }).join('');
+
+  // Labels X (fechas): mostramos primera, medio, última si hay pocos puntos, sino 4
+  const labelIdxs = n <= 4
+    ? series.map((_,i) => i)
+    : [0, Math.floor(n/3), Math.floor(2*n/3), n-1];
+  const dayLabel = (d) => {
+    const parts = d.split('-'); // YYYY-MM-DD
+    return parts[2] + '/' + parts[1];
+  };
+  const xLabels = labelIdxs.map(i => {
+    const x = xFor(i);
+    return `<text x="${x.toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--text3)">${dayLabel(series[i].date)}</text>`;
+  }).join('');
+
+  // Puntos (dots) en cada vértice
+  const dotsPurch = series.map((d,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yPurch(d.purchases).toFixed(1)}" r="1.8" fill="#3b82f6"/>`).join('');
+  const dotsRev   = series.map((d,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yRev(d.revenue).toFixed(1)}" r="1.8" fill="#22c55e"/>`).join('');
+  const dotsRoas  = series.map((d,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yRoas(d.roas).toFixed(1)}" r="1.8" fill="#f59e0b"/>`).join('');
+
+  return `
+    <div class="ad-chart-legend">
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#3b82f6"></span>Compras <b style="color:var(--text)">(max ${fmtN(maxPurch)})</b></span>
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#22c55e"></span>Facturación <b style="color:var(--text)">(max ${sym}${fmtN(Math.round(maxRev))})</b></span>
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#f59e0b"></span>ROAS <b style="color:var(--text)">(max ×${fmtDec(maxRoas)})</b></span>
+    </div>
+    <svg class="ad-chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${gridLines}
+      <path d="${pathPurch}" fill="none" stroke="#3b82f6" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="${pathRev}"   fill="none" stroke="#22c55e" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="${pathRoas}"  fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-linejoin="round"/>
+      ${dotsPurch}${dotsRev}${dotsRoas}
+      ${xLabels}
+    </svg>
+  `;
 }
 
 // ══════════════════════════════════════
@@ -2373,6 +2519,10 @@ function onTagDrop(e, table) {
     arr.splice(si,1); arr.splice(ti,0,dragTagKey);
     colOrderArr = arr;
     localStorage.setItem('cr_colorder', JSON.stringify(colOrderArr));
+    // Mantener abierto el panel y refrescar orden de chips
+    const wrap = document.getElementById('colCfg');
+    if (wrap) wrap.dataset.open = '1';
+    buildColCfg();
     renderDetail();
   }
 }
