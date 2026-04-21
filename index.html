@@ -2172,17 +2172,19 @@ function fetchDailySeries(accountId, dp, adIds) {
   });
 }
 
-// Construye el SVG del mini-gráfico. Estilo minimalista: curvas suaves,
-// sin gridlines, endpoints marcados, labels de fecha discretos.
-// Recibe el ancho del container en px para NO estirar el SVG.
+// Construye el SVG del mini-gráfico. Estilo minimalista: curvas suaves con
+// relleno gradiente, labels de días en X (todos los medidos) y peak-markers
+// en Y (valor máximo de cada serie, color-coded).
 function buildAdChartSvg(series, sym, containerW) {
   if (!series || series.length < 2) {
     return '<div class="ad-chart-empty">Sin datos suficientes para graficar</div>';
   }
-  const W = Math.max(240, containerW || 340), H = 110, PL = 12, PR = 12, PT = 8, PB = 22;
+  const W = Math.max(240, containerW || 340), H = 130, PL = 16, PR = 16, PT = 14, PB = 28;
   const plotW = W - PL - PR, plotH = H - PT - PB;
   const n = series.length;
   const xFor = i => PL + (n === 1 ? plotW/2 : (i/(n-1))*plotW);
+  // UID único por chart para que los <defs id=...> no colisionen
+  const uid = 'c' + Math.random().toString(36).slice(2, 8);
 
   const maxPurch = Math.max(1, ...series.map(d => d.purchases));
   const maxRev   = Math.max(1, ...series.map(d => d.revenue));
@@ -2192,17 +2194,17 @@ function buildAdChartSvg(series, sym, containerW) {
   const yRev   = v => PT + plotH - (v / maxRev)   * plotH;
   const yRoas  = v => PT + plotH - (v / maxRoas)  * plotH;
 
-  // Smooth Catmull-Rom → Bézier cubic para curvas sin picos duros.
+  // Smooth Catmull-Rom → Bézier cubic
   function smoothPath(points) {
     if (points.length < 2) return '';
     if (points.length === 2) return `M${points[0][0]},${points[0][1]} L${points[1][0]},${points[1][1]}`;
-    let d = `M${points[0][0]},${points[0][1]}`;
+    let d = `M${points[0][0].toFixed(1)},${points[0][1].toFixed(1)}`;
     for (let i = 0; i < points.length - 1; i++) {
       const p0 = points[i - 1] || points[i];
       const p1 = points[i];
       const p2 = points[i + 1];
       const p3 = points[i + 2] || p2;
-      const t = 0.18; // tensión: menor = más suave
+      const t = 0.18;
       const c1x = p1[0] + (p2[0] - p0[0]) * t;
       const c1y = p1[1] + (p2[1] - p0[1]) * t;
       const c2x = p2[0] - (p3[0] - p1[0]) * t;
@@ -2211,51 +2213,91 @@ function buildAdChartSvg(series, sym, containerW) {
     }
     return d;
   }
+  // Path del área (línea smooth cerrada hacia abajo)
+  function areaPath(points) {
+    const line = smoothPath(points);
+    if (!line) return '';
+    const last = points[points.length - 1];
+    const first = points[0];
+    return line + ` L${last[0].toFixed(1)},${(PT+plotH).toFixed(1)} L${first[0].toFixed(1)},${(PT+plotH).toFixed(1)} Z`;
+  }
 
   const pointsPurch = series.map((d,i) => [xFor(i), yPurch(d.purchases)]);
   const pointsRev   = series.map((d,i) => [xFor(i), yRev(d.revenue)]);
   const pointsRoas  = series.map((d,i) => [xFor(i), yRoas(d.roas)]);
 
-  const pathPurch = smoothPath(pointsPurch);
-  const pathRev   = smoothPath(pointsRev);
-  const pathRoas  = smoothPath(pointsRoas);
+  // Baseline subtle
+  const baseline = `<line x1="${PL}" x2="${PL+plotW}" y1="${PT+plotH}" y2="${PT+plotH}" stroke="var(--border)" stroke-width="0.5"/>`;
 
-  // Labels X (fechas): solo primera y última para mantener limpio
+  // X axis labels — stride inteligente según ancho disponible.
+  // Cada label ocupa ~30-34px. Stride = ceil(n / maxLabels).
   const dayLabel = (d) => {
     const parts = d.split('-'); // YYYY-MM-DD
     return parts[2] + '/' + parts[1];
   };
+  const maxLabels = Math.max(2, Math.floor(plotW / 34));
+  const stride = Math.max(1, Math.ceil(n / maxLabels));
   let xLabels = '';
-  if (n >= 2) {
-    xLabels += `<text x="${xFor(0).toFixed(1)}" y="${H-6}" text-anchor="start" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[0].date)}</text>`;
-    xLabels += `<text x="${xFor(n-1).toFixed(1)}" y="${H-6}" text-anchor="end" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[n-1].date)}</text>`;
-    // Punto medio si hay espacio (≥4 puntos y ancho suficiente)
-    if (n >= 4 && W > 320) {
-      const mid = Math.floor(n/2);
-      xLabels += `<text x="${xFor(mid).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[mid].date)}</text>`;
-    }
+  for (let i = 0; i < n; i += stride) {
+    const x = xFor(i);
+    const anchor = (i === 0) ? 'start' : ((i === n-1) ? 'end' : 'middle');
+    xLabels += `<text x="${x.toFixed(1)}" y="${(H-8).toFixed(1)}" text-anchor="${anchor}" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[i].date)}</text>`;
+  }
+  // Garantizar que el último día se vea si no cayó en el stride
+  if ((n - 1) % stride !== 0) {
+    const x = xFor(n - 1);
+    xLabels += `<text x="${x.toFixed(1)}" y="${(H-8).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[n-1].date)}</text>`;
   }
 
-  // Endpoints: dot solo en el último punto de cada serie (estilo minimal)
-  const endDot = (pts, color) => {
-    if (!pts.length) return '';
-    const [x,y] = pts[pts.length - 1];
-    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.8" fill="${color}"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${color}" opacity=".18"/>`;
-  };
+  // Peak markers: valor máx de cada serie en su posición X de pico
+  function peakLabel(vals, color, formatFn, avoidYs) {
+    let idx = 0, maxV = vals[0];
+    for (let i = 1; i < vals.length; i++) if (vals[i] > maxV) { maxV = vals[i]; idx = i; }
+    if (maxV <= 0) return { svg: '', y: -9999 };
+    const x = xFor(idx);
+    let y = PT + plotH - (maxV / Math.max(...vals)) * plotH - 4;
+    // Evitar colisión con labels previos (≥10px de separación)
+    while (avoidYs.some(ay => Math.abs(ay - y) < 10)) y -= 10;
+    if (y < 2) y = 2;
+    const txtAnchor = (idx === 0) ? 'start' : ((idx === n-1) ? 'end' : 'middle');
+    const label = formatFn(maxV);
+    const svg = `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${txtAnchor}" font-size="9" font-weight="700" fill="${color}" font-family="inherit">${label}</text>`;
+    return { svg, y };
+  }
+  const avoidYs = [];
+  const pkP = peakLabel(series.map(d => d.purchases), '#3b82f6', v => fmtN(v), avoidYs); avoidYs.push(pkP.y);
+  const pkR = peakLabel(series.map(d => d.revenue),   '#22c55e', v => sym + fmtN(Math.round(v)), avoidYs); avoidYs.push(pkR.y);
+  const pkX = peakLabel(series.map(d => d.roas),      '#f59e0b', v => '×' + fmtDec(v), avoidYs); avoidYs.push(pkX.y);
 
   return `
     <div class="ad-chart-legend">
-      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#3b82f6"></span>Compras <b style="color:var(--text)">(max ${fmtN(maxPurch)})</b></span>
-      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#22c55e"></span>Facturación <b style="color:var(--text)">(max ${sym}${fmtN(Math.round(maxRev))})</b></span>
-      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#f59e0b"></span>ROAS <b style="color:var(--text)">(max ×${fmtDec(maxRoas)})</b></span>
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#3b82f6"></span>Compras</span>
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#22c55e"></span>Facturación</span>
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#f59e0b"></span>ROAS</span>
     </div>
     <svg class="ad-chart-svg" width="${W}" height="${H}">
-      <path d="${pathPurch}" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-      <path d="${pathRev}"   fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-      <path d="${pathRoas}"  fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-      ${endDot(pointsPurch, '#3b82f6')}
-      ${endDot(pointsRev,   '#22c55e')}
-      ${endDot(pointsRoas,  '#f59e0b')}
+      <defs>
+        <linearGradient id="${uid}-gP" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="${uid}-gR" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#22c55e" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="${uid}-gX" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${baseline}
+      <path d="${areaPath(pointsPurch)}" fill="url(#${uid}-gP)" stroke="none"/>
+      <path d="${areaPath(pointsRev)}"   fill="url(#${uid}-gR)" stroke="none"/>
+      <path d="${areaPath(pointsRoas)}"  fill="url(#${uid}-gX)" stroke="none"/>
+      <path d="${smoothPath(pointsPurch)}" fill="none" stroke="#3b82f6" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${smoothPath(pointsRev)}"   fill="none" stroke="#22c55e" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${smoothPath(pointsRoas)}"  fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      ${pkP.svg}${pkR.svg}${pkX.svg}
       ${xLabels}
     </svg>
   `;
