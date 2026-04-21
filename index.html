@@ -155,7 +155,7 @@ tr.row-hidden{display:none}
 .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .tag{display:inline-flex;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 
-/* ── DETAIL ROW ── */
+/* ── DETAIL ROW (legacy, kept for compat) ── */
 .detail-row{display:none;background:var(--bg2)}
 .detail-panel{padding:16px 20px}
 .detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin-bottom:14px}
@@ -163,6 +163,28 @@ tr.row-hidden{display:none}
 .dl{font-size:11px;color:var(--text2);margin-bottom:2px}
 .dv{font-size:16px;font-weight:700}
 textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--radius);padding:8px 12px;font-size:13px;font-family:inherit;resize:vertical;min-height:60px;background:var(--bg);color:var(--text)}
+
+/* ── MASTER-DETAIL LAYOUT (clientes) ── */
+.detail-layout{display:grid;grid-template-columns:minmax(240px, 300px) 1fr;gap:14px;margin-top:12px}
+.client-picker{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:6px;display:flex;flex-direction:column;gap:2px;max-height:calc(100vh - 220px);overflow-y:auto;align-self:start;position:sticky;top:12px}
+.cpicker-row{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:var(--radius);cursor:pointer;transition:background .12s ease, border-color .12s ease;border:0.5px solid transparent;font-size:13px;color:var(--text)}
+.cpicker-row:hover{background:var(--bg2)}
+.cpicker-row.selected{background:var(--blue-bg);border-color:var(--blue)}
+.cpicker-row.selected .cpicker-name{color:var(--text);font-weight:600}
+.cpicker-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cpicker-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpicker-pct{font-size:11px;font-weight:700;letter-spacing:.02em;flex-shrink:0}
+.cpicker-groupheader{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding:10px 10px 4px;margin-top:4px;font-weight:700;border-top:0.5px solid var(--border);display:block}
+.cpicker-groupheader:first-child{border-top:none;margin-top:0}
+.client-detail{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;min-width:0}
+.client-detail-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:0.5px solid var(--border)}
+.client-detail-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.client-detail-name{font-size:18px;font-weight:700;cursor:text;border-bottom:1px dashed var(--border2);padding-bottom:1px}
+.client-detail-empty{padding:40px 20px;text-align:center;color:var(--text3);font-size:13px}
+@media (max-width: 900px){
+  .detail-layout{grid-template-columns:1fr}
+  .client-picker{max-height:260px;position:static}
+}
 
 
 /* ── TOP ADS ── */
@@ -451,19 +473,14 @@ tr:hover .row-actions{opacity:1}
             <input type="date" id="dateTo1" class="inp" style="width:auto">
             <button class="btn btn-sm btn-primary" onclick="loadDetail()">Aplicar</button>
           </span>
-          <select id="clientFilter" onchange="renderDetail()">
-            <option value="">Todas las cuentas</option>
-          </select>
           <button class="btn btn-sm btn-primary" onclick="loadDetail()">↻ Actualizar</button>
+          <input type="search" id="clientSearch" class="inp" placeholder="Buscar cliente…"
+                 oninput="renderClientPicker()"
+                 style="flex:1;min-width:200px;max-width:320px">
         </div>
-        <div class="col-cfg" id="colCfg"></div>
-        <div class="tbl-wrap">
-          <div class="tbl-scroll">
-            <table>
-              <thead id="detailHead"></thead>
-              <tbody id="detailBody"></tbody>
-            </table>
-          </div>
+        <div class="detail-layout">
+          <aside class="client-picker" id="clientPicker"></aside>
+          <main class="client-detail" id="clientDetail"></main>
         </div>
       </div>
 
@@ -671,6 +688,8 @@ let customNames   = JSON.parse(localStorage.getItem('cr_names')     || '{}');
 let clientGroups  = JSON.parse(localStorage.getItem('cr_groups')    || '{}');
 let groupSettings = JSON.parse(localStorage.getItem('cr_gsettings') || '{}');
 let colOrder      = JSON.parse(localStorage.getItem('cr_colorder')  || 'null');
+// Master-detail: cliente actualmente seleccionado en el panel de Detalle
+let selectedClientId = null;
 
 // Column definitions
 // NOTA: ya no hay columnas "always:true". La vista por defecto es minimalista
@@ -1101,9 +1120,6 @@ function launchApp(readonly) {
       avatarEl.textContent = (fbUser.name||'U')[0].toUpperCase();
     }
     document.getElementById('userName').textContent = fbUser.name || '';
-    // populate client filter
-    const sel = document.getElementById('clientFilter');
-    adAccounts.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.name}</option>`);
     renderAccountsPage();
   }
   checkMonthRollover();
@@ -1227,7 +1243,8 @@ async function loadOverview() {
 
 async function loadDetail() {
   const dp = getDateParams('datePreset','dateFrom1','dateTo1');
-  document.getElementById('detailBody').innerHTML = `<tr><td colspan="20"><div class="loading" style="display:flex"><div class="spinner"></div><p>Cargando...</p></div></td></tr>`;
+  const det = document.getElementById('clientDetail');
+  if (det) det.innerHTML = `<div class="loading" style="display:flex;padding:40px 0"><div class="spinner"></div><p>Cargando...</p></div>`;
   accountsData = await Promise.all(adAccounts.map(async acc => {
     const ins = await fetchInsights(acc.id, dp);
     return { ...acc, ...ins };
@@ -1577,173 +1594,224 @@ function getActiveCols() {
     .filter(c => c && visibleColKeys.has(c.key));
 }
 
+// ══════════════════════════════════════
+// MASTER-DETAIL: picker (sidebar) + detalle (panel)
+// ══════════════════════════════════════
 function renderDetail() {
-  const filterAccId = document.getElementById('clientFilter').value;
-  const list = filterAccId ? accountsData.filter(a=>a.id===filterAccId) : accountsData;
-  const activeCols = getActiveCols();
+  renderClientPicker();
+  renderClientDetail();
+}
 
-  // Build draggable header — ALL cols except "Cuenta" are draggable
-  const headRow = document.createElement('tr');
-  // "Cuenta" fixed
-  const thCuenta = document.createElement('th');
-  thCuenta.textContent = 'Cuenta';
-  headRow.appendChild(thCuenta);
-  // All active cols: draggable
-  activeCols.forEach(c => {
-    const th = document.createElement('th');
-    th.textContent = c.label;
-    makeDraggableTh(th, c.key, 'det');
-    headRow.appendChild(th);
-  });
-  // Estado + actions: fixed
-  const thEstado = document.createElement('th');
-  thEstado.textContent = 'Estado';
-  headRow.appendChild(thEstado);
-  headRow.appendChild(document.createElement('th'));
-  document.getElementById('detailHead').innerHTML = '';
-  document.getElementById('detailHead').appendChild(headRow);
+function renderClientPicker() {
+  const wrap = document.getElementById('clientPicker');
+  if (!wrap) return;
+  const searchEl = document.getElementById('clientSearch');
+  const q = (searchEl && searchEl.value || '').trim().toLowerCase();
 
-  const body = document.getElementById('detailBody');
-  body.innerHTML = '';
-  if (!list.length) {
-    body.innerHTML = `<tr><td colspan="20"><div class="empty"><p>Sin datos. Hacé clic en Actualizar.</p></div></td></tr>`;
+  const rows = buildDisplayList(accountsData);
+
+  // Filter by search query; group-headers pass through, we clean orphans after
+  const filtered = q
+    ? rows.filter(r => {
+        if (r.type === 'group-header') return true;
+        const acc = r.data || {};
+        const label = ((acc.name || '') + ' ' + (displayName(acc.id, acc.name) || '')).toLowerCase();
+        return label.includes(q);
+      })
+    : rows;
+
+  // Drop orphan group headers (headers with no matching member behind them)
+  const cleaned = [];
+  for (let i = 0; i < filtered.length; i++) {
+    const r = filtered[i];
+    if (r.type === 'group-header') {
+      const next = filtered[i + 1];
+      if (next && next.type === 'group-member' && next.gid === r.gid) cleaned.push(r);
+    } else {
+      cleaned.push(r);
+    }
+  }
+
+  if (!cleaned.length) {
+    wrap.innerHTML = `<div class="client-detail-empty" style="padding:20px">Sin resultados</div>`;
     return;
   }
 
-  list.forEach(acc => {
-    const s = settings[acc.id]||{};
-    const obj = s.objective||0, bud = s.budget||0;
-    const roas = acc.spend>0 ? totalRevenue(acc)/acc.spend : 0;
-    const budPct = bud>0 ? Math.round(acc.spend/bud*100) : 0;
-    const objPct = obj>0 ? Math.round(totalRevenue(acc)/obj*100) : 0;
+  // Auto-select: keep current if still present, otherwise first selectable
+  const selectables = cleaned.filter(r => r.type !== 'group-header');
+  if (!selectables.find(r => r.data.id === selectedClientId)) {
+    selectedClientId = selectables[0] ? selectables[0].data.id : null;
+  }
+
+  wrap.innerHTML = cleaned.map(r => {
+    if (r.type === 'group-header') {
+      return `<div class="cpicker-groupheader">${r.group.name}</div>`;
+    }
+    const acc = r.data;
+    const s = settings[acc.id] || {};
+    const obj = s.objective || 0;
     const sem = semaphore(acc);
-    const cur = s.currency||'ARS';
-    const sym = CURRENCY_SYMBOLS[cur]||'$';
-
-    const tr = document.createElement('tr');
-    tr.className = 'clickable';
-    tr.id = 'row-'+acc.id;
-    tr.onclick = () => toggleDetail(acc.id);
-    tr.innerHTML = `
-      <td style="font-weight:600">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span onclick="startRenameDetail('${acc.id}',event)" title="Clic para editar nombre · Nombre real: ${acc.name}"
-                id="dname-dt-${acc.id}"
-                style="cursor:text;border-bottom:1px dashed var(--border2);padding-bottom:1px">
-            ${displayName(acc.id,acc.name)}
-          </span>
-          <span class="acc-currency-badge">${cur}</span>
-        </div>
-      </td>
-      ${activeCols.map(c => {
-        if(c.key==='objetivo')  return `<td>${obj?sym+fmtN(obj):'<span style="color:var(--text3)">—</span>'}</td>`;
-        if(c.key==='roas')      return `<td style="font-weight:700">×${fmtDec(roas)}</td>`;
-        if(c.key==='objPct')    return `<td>${obj?pbar(objPct,sem.color):'—'}</td>`;
-        if(c.key==='budgetPct'){const bc=budPct>100?'var(--red)':budPct>85?'var(--amber)':'var(--green)';return`<td>${bud?pbar(budPct,bc):'—'}</td>`;}
-        if(c.key==='ctr')       return `<td>${fmtDec(acc.ctr,2)}%</td>`;
-        if(['costPerPurchase','costPerMessageReal'].includes(c.key)) return `<td>${acc[c.key]>0?sym+fmtDec(acc[c.key],2):'—'}</td>`;
-        if(['spend','revenue'].includes(c.key)) return `<td>${fmtCurrency(acc[c.key],acc.id)}</td>`;
-        return `<td>${fmtN(acc[c.key])}</td>`;
-      }).join('')}
-      <td style="text-align:center;width:48px">
-        <div title="${sem.label}${obj>0?' · Proyectado: '+Math.round(((acc.revenue/obj)/monthProgress)*100)+'%':''}"
-             style="display:inline-flex;flex-direction:column;align-items:center;gap:3px;cursor:default">
-          <svg width="20" height="20" viewBox="0 0 20 20">
-            <circle cx="10" cy="10" r="9" fill="${sem.bg}" stroke="${sem.color}" stroke-width="1.5"/>
-            <circle cx="10" cy="10" r="5" fill="${sem.color}"/>
-          </svg>
-          <span style="font-size:9px;font-weight:700;color:${sem.tc};white-space:nowrap">${obj>0?Math.round(((acc.revenue/obj)/monthProgress)*100)+'%':''}</span>
-        </div>
-      </td>
-      <td style="color:var(--text3);font-size:12px">▼</td>
+    const isSel = acc.id === selectedClientId;
+    const name = acc.isGroup ? acc.name : displayName(acc.id, acc.name);
+    const objPct = obj > 0 ? Math.round(totalRevenue(acc) / obj * 100) : null;
+    const pctHtml = objPct !== null
+      ? `<span class="cpicker-pct" style="color:${sem.tc}">${objPct}%</span>`
+      : `<span class="cpicker-pct" style="color:var(--text3)">—</span>`;
+    return `
+      <div class="cpicker-row ${isSel ? 'selected' : ''}" data-acc-id="${acc.id}"
+           onclick="selectClient('${acc.id}')" title="${acc.name || ''}">
+        <span class="cpicker-dot" style="background:${sem.color}"></span>
+        <span class="cpicker-name">${name}</span>
+        ${pctHtml}
+      </div>
     `;
-    body.appendChild(tr);
-
-    // Detail expansion
-    const trk = s.tracking||'ecommerce';
-    const detRow = document.createElement('tr');
-    detRow.className = 'detail-row';
-    detRow.id = 'det-'+acc.id;
-    const ecom = trk==='ecommerce'||trk==='both';
-    const msg  = trk==='messaging'||trk==='both';
-    detRow.innerHTML = `<td colspan="20"><div class="detail-panel">
-      <div class="detail-grid">
-        <div class="dcard"><div class="dl">Inversión</div><div class="dv">${fmtCurrency(acc.spend,acc.id)}</div></div>
-        <div class="dcard"><div class="dl">Facturado</div><div class="dv">${fmtCurrency(acc.revenue,acc.id)}</div></div>
-        <div class="dcard"><div class="dl">ROAS</div><div class="dv">×${fmtDec(roas)}</div></div>
-        <div class="dcard"><div class="dl">% Objetivo</div><div class="dv" style="color:${sem.color}">${obj?objPct+'%':'—'}</div></div>
-        <div class="dcard"><div class="dl">CTR</div><div class="dv">${fmtDec(acc.ctr,2)}%</div></div>
-        <div class="dcard"><div class="dl">Clics</div><div class="dv">${fmtN(acc.clicks)}</div></div>
-        ${ecom?`
-        <div class="dcard"><div class="dl">Compras</div><div class="dv">${fmtN(acc.purchases)}</div></div>
-        <div class="dcard"><div class="dl">Agreg. carrito</div><div class="dv">${fmtN(acc.addToCart)}</div></div>
-        <div class="dcard"><div class="dl">Pagos iniciados</div><div class="dv">${fmtN(acc.checkouts)}</div></div>
-        <div class="dcard"><div class="dl">Costo x compra</div><div class="dv">${acc.costPerPurchase>0?sym+fmtDec(acc.costPerPurchase,2):'—'}</div></div>`:''}
-        ${msg?`
-        <div class="dcard"><div class="dl">Mensajes</div><div class="dv">${fmtN(acc.messagesReal)}</div></div>
-        <div class="dcard"><div class="dl">Costo x msg</div><div class="dv">${acc.costPerMessageReal>0?sym+fmtDec(acc.costPerMessageReal,2):'—'}</div></div>`:''}
-      </div>
-      ${!isReadonly && msg ? `
-      <div style="padding:12px;background:var(--amber-bg);border-radius:var(--radius);margin-bottom:10px;border:0.5px solid var(--amber)">
-        <div style="font-size:12px;font-weight:600;color:var(--amber-tc);margin-bottom:6px">Ventas manuales del mes (mensajería)</div>
-        <div style="font-size:11px;color:var(--amber-tc);margin-bottom:8px;opacity:.85">Ingresá las ventas informadas por el cliente. Se suman al revenue de Meta para calcular el progreso hacia el objetivo.</div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <input type="number" id="manrev-${acc.id}" value="${manualRevenue[acc.id]||''}"
-            placeholder="0"
-            style="width:160px;padding:7px 10px;border:0.5px solid var(--amber);border-radius:var(--radius);font-size:13px;background:var(--bg);color:var(--text)"
-            oninput="previewManualRev('${acc.id}')">
-          <button class="btn btn-sm" style="background:var(--amber);color:#fff;border-color:var(--amber)"
-            onclick="saveManualRev('${acc.id}',event)">Guardar ventas</button>
-          <span id="manrev-preview-${acc.id}" style="font-size:12px;color:var(--amber-tc)">
-            ${manualRevenue[acc.id]>0 ? sym+fmtN(Math.round(manualRevenue[acc.id]))+' cargado · Total: '+sym+fmtN(Math.round(totalRevenue(acc))) : ''}
-          </span>
-        </div>
-      </div>` : ''}
-      ${!isReadonly?`
-      <div>
-        <div style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:6px">Observaciones</div>
-        <textarea class="obs" id="obs-${acc.id}" placeholder="Anotaciones sobre esta cuenta...">${observations[acc.id]||''}</textarea>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-          <button class="btn btn-sm" onclick="openModal('${acc.id}','${acc.name}',event)">Configurar objetivo</button>
-          <button class="btn btn-sm btn-primary" id="savebtn-${acc.id}" onclick="saveObs('${acc.id}',event)">Guardar observación</button>
-        </div>
-      </div>`:''}
-      <div class="top-ads-section" id="top-ads-section-${acc.id}">
-        <div class="top-ads-header">
-          <span class="top-ads-title">Anuncios ganadores</span>
-          <div class="top-ads-controls">
-            <label style="font-size:12px;color:var(--text2)">Ordenar por</label>
-            <select id="top-ads-sort-${acc.id}" style="padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text)" onchange="loadTopAds('${acc.id}')">
-              <option value="roas" selected>ROAS</option>
-              <option value="purchases">Compras</option>
-              <option value="revenue">Facturación</option>
-            </select>
-            <label style="font-size:12px;color:var(--text2);margin-left:4px">Top</label>
-            <select id="top-ads-n-${acc.id}" style="padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text)" onchange="loadTopAds('${acc.id}')">
-              <option value="3">3</option>
-              <option value="5" selected>5</option>
-              <option value="10">10</option>
-            </select>
-            <button class="btn btn-xs" onclick="loadTopAds('${acc.id}')">Cargar</button>
-          </div>
-        </div>
-        <div id="top-ads-content-${acc.id}" class="top-ads-loading" style="display:none"></div>
-      </div>
-    </div></td>`;
-    body.appendChild(detRow);
-  });
+  }).join('');
 }
 
-function toggleDetail(id) {
-  const det = document.getElementById('det-'+id);
-  if (!det) return;
-  const isOpening = det.style.display !== 'table-row';
-  det.style.display = isOpening ? 'table-row' : 'none';
-  // Cargar top ads la primera vez que se abre
-  if (isOpening) {
-    const content = document.getElementById('top-ads-content-'+id);
-    if (content && content.style.display === 'none') loadTopAds(id);
+function selectClient(id) {
+  if (selectedClientId === id) return;
+  selectedClientId = id;
+  // Actualizar highlight sin re-renderizar toda la lista
+  const picker = document.getElementById('clientPicker');
+  if (picker) {
+    picker.querySelectorAll('.cpicker-row').forEach(el => {
+      el.classList.toggle('selected', el.dataset.accId === id);
+    });
   }
+  renderClientDetail();
+}
+
+function findAccountById(id) {
+  if (!id) return null;
+  if (id.startsWith('group_')) {
+    const gid = id.replace('group_', '');
+    const group = clientGroups[gid];
+    if (!group) return null;
+    const merged = mergeGroupAccounts(group);
+    return merged || null;
+  }
+  return accountsData.find(a => a.id === id) || null;
+}
+
+function renderClientDetail() {
+  const wrap = document.getElementById('clientDetail');
+  if (!wrap) return;
+
+  const acc = findAccountById(selectedClientId);
+  if (!acc) {
+    wrap.innerHTML = `<div class="client-detail-empty">Sin cuentas para mostrar. Hacé clic en <strong>Actualizar</strong>.</div>`;
+    return;
+  }
+
+  const s = settings[acc.id] || {};
+  const obj = s.objective || 0, bud = s.budget || 0;
+  const roas = acc.spend > 0 ? totalRevenue(acc) / acc.spend : 0;
+  const budPct = bud > 0 ? Math.round(acc.spend / bud * 100) : 0;
+  const objPct = obj > 0 ? Math.round(totalRevenue(acc) / obj * 100) : 0;
+  const sem = semaphore(acc);
+  const cur = s.currency || 'ARS';
+  const sym = CURRENCY_SYMBOLS[cur] || '$';
+  const trk = s.tracking || 'ecommerce';
+  const ecom = trk === 'ecommerce' || trk === 'both';
+  const msg  = trk === 'messaging' || trk === 'both';
+  const name = acc.isGroup ? acc.name : displayName(acc.id, acc.name);
+  const projected = obj > 0 && monthProgress > 0
+    ? Math.round(((acc.revenue / obj) / monthProgress) * 100)
+    : null;
+
+  wrap.innerHTML = `
+    <div class="client-detail-header">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0">
+        <span class="client-detail-dot" style="background:${sem.color}" title="${sem.label}"></span>
+        <span class="client-detail-name" onclick="startRenameDetail('${acc.id}',event)"
+              id="dname-dt-${acc.id}"
+              title="Clic para editar nombre · Nombre real: ${acc.name||''}">${name}</span>
+        <span class="acc-currency-badge">${cur}</span>
+        ${projected !== null ? `<span style="font-size:12px;color:${sem.tc};font-weight:600">Proyectado ${projected}%</span>` : ''}
+      </div>
+    </div>
+    <div class="detail-grid">
+      <div class="dcard"><div class="dl">Inversión</div><div class="dv">${fmtCurrency(acc.spend,acc.id)}</div></div>
+      <div class="dcard"><div class="dl">Facturado</div><div class="dv">${fmtCurrency(acc.revenue,acc.id)}</div></div>
+      <div class="dcard"><div class="dl">ROAS</div><div class="dv">×${fmtDec(roas)}</div></div>
+      <div class="dcard"><div class="dl">Objetivo</div><div class="dv">${obj?sym+fmtN(obj):'—'}</div></div>
+      <div class="dcard"><div class="dl">% Objetivo</div><div class="dv" style="color:${sem.color}">${obj?objPct+'%':'—'}</div></div>
+      <div class="dcard"><div class="dl">% Presupuesto</div><div class="dv">${bud?budPct+'%':'—'}</div></div>
+      <div class="dcard"><div class="dl">CTR</div><div class="dv">${fmtDec(acc.ctr,2)}%</div></div>
+      <div class="dcard"><div class="dl">Clics</div><div class="dv">${fmtN(acc.clicks)}</div></div>
+      ${ecom?`
+      <div class="dcard"><div class="dl">Compras</div><div class="dv">${fmtN(acc.purchases)}</div></div>
+      <div class="dcard"><div class="dl">Agreg. carrito</div><div class="dv">${fmtN(acc.addToCart)}</div></div>
+      <div class="dcard"><div class="dl">Pagos iniciados</div><div class="dv">${fmtN(acc.checkouts)}</div></div>
+      <div class="dcard"><div class="dl">Costo x compra</div><div class="dv">${acc.costPerPurchase>0?sym+fmtDec(acc.costPerPurchase,2):'—'}</div></div>`:''}
+      ${msg?`
+      <div class="dcard"><div class="dl">Mensajes</div><div class="dv">${fmtN(acc.messagesReal)}</div></div>
+      <div class="dcard"><div class="dl">Costo x msg</div><div class="dv">${acc.costPerMessageReal>0?sym+fmtDec(acc.costPerMessageReal,2):'—'}</div></div>`:''}
+    </div>
+    ${!isReadonly && msg ? `
+    <div style="padding:12px;background:var(--amber-bg);border-radius:var(--radius);margin-top:4px;margin-bottom:10px;border:0.5px solid var(--amber)">
+      <div style="font-size:12px;font-weight:600;color:var(--amber-tc);margin-bottom:6px">Ventas manuales del mes (mensajería)</div>
+      <div style="font-size:11px;color:var(--amber-tc);margin-bottom:8px;opacity:.85">Ingresá las ventas informadas por el cliente. Se suman al revenue de Meta para calcular el progreso hacia el objetivo.</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <input type="number" id="manrev-${acc.id}" value="${manualRevenue[acc.id]||''}"
+          placeholder="0"
+          style="width:160px;padding:7px 10px;border:0.5px solid var(--amber);border-radius:var(--radius);font-size:13px;background:var(--bg);color:var(--text)"
+          oninput="previewManualRev('${acc.id}')">
+        <button class="btn btn-sm" style="background:var(--amber);color:#fff;border-color:var(--amber)"
+          onclick="saveManualRev('${acc.id}',event)">Guardar ventas</button>
+        <span id="manrev-preview-${acc.id}" style="font-size:12px;color:var(--amber-tc)">
+          ${manualRevenue[acc.id]>0 ? sym+fmtN(Math.round(manualRevenue[acc.id]))+' cargado · Total: '+sym+fmtN(Math.round(totalRevenue(acc))) : ''}
+        </span>
+      </div>
+    </div>` : ''}
+    ${!isReadonly && !acc.isGroup ? `
+    <div style="margin-top:6px">
+      <div style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:6px">Observaciones</div>
+      <textarea class="obs" id="obs-${acc.id}" placeholder="Anotaciones sobre esta cuenta...">${observations[acc.id]||''}</textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-sm" onclick="openModal('${acc.id}','${acc.name}',event)">Configurar objetivo</button>
+        <button class="btn btn-sm btn-primary" id="savebtn-${acc.id}" onclick="saveObs('${acc.id}',event)">Guardar observación</button>
+      </div>
+    </div>`:''}
+    ${!acc.isGroup ? `
+    <div class="top-ads-section" id="top-ads-section-${acc.id}">
+      <div class="top-ads-header">
+        <span class="top-ads-title">Anuncios ganadores</span>
+        <div class="top-ads-controls">
+          <label style="font-size:12px;color:var(--text2)">Ordenar por</label>
+          <select id="top-ads-sort-${acc.id}" style="padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text)" onchange="loadTopAds('${acc.id}')">
+            <option value="roas" selected>ROAS</option>
+            <option value="purchases">Compras</option>
+            <option value="revenue">Facturación</option>
+          </select>
+          <label style="font-size:12px;color:var(--text2);margin-left:4px">Top</label>
+          <select id="top-ads-n-${acc.id}" style="padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text)" onchange="loadTopAds('${acc.id}')">
+            <option value="3">3</option>
+            <option value="5" selected>5</option>
+            <option value="10">10</option>
+          </select>
+          <button class="btn btn-xs" onclick="loadTopAds('${acc.id}')">Cargar</button>
+        </div>
+      </div>
+      <div id="top-ads-content-${acc.id}" class="top-ads-loading" style="display:none"></div>
+    </div>` : `
+    <div style="margin-top:14px;padding:10px 12px;background:var(--bg2);border-radius:var(--radius);font-size:12px;color:var(--text2)">
+      Los anuncios ganadores no están disponibles en vista agrupada. Seleccioná una cuenta individual para verlos.
+    </div>`}
+  `;
+
+  // Auto-cargar top ads para el cliente seleccionado (si es cuenta real)
+  if (!acc.isGroup) {
+    setTimeout(() => {
+      const content = document.getElementById('top-ads-content-' + acc.id);
+      if (content) loadTopAds(acc.id);
+    }, 0);
+  }
+}
+
+// Stub mantenido por compatibilidad — ya no se usa (click-to-expand removido)
+function toggleDetail(id) {
+  selectClient(id);
 }
 
 // ══════════════════════════════════════
@@ -2698,12 +2766,7 @@ async function saveAccountVisibility() {
   // 2. Apply filter — adAccounts is now updated
   applyAccountVisibility();
 
-  // 3. Rebuild client filter dropdown
-  const sel = document.getElementById('clientFilter');
-  sel.innerHTML = '<option value="">Todas las cuentas</option>';
-  adAccounts.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.name}</option>`);
-
-  // 4. Fetch fresh data for the visible accounts and re-render everything
+  // 3. Fetch fresh data for the visible accounts and re-render everything
   try {
     await loadOverview();
     detailLoaded = false; // force detail to reload next time it's opened
@@ -3017,7 +3080,8 @@ function applyPreset() {
 function exportReport(format) {
   // Gather active cols and current data
   const activeCols = getActiveCols();
-  const filterAccId = document.getElementById('clientFilter').value;
+  // Export respeta el cliente seleccionado en el master-detail; si no hay selección, exporta todos
+  const filterAccId = (selectedClientId && !String(selectedClientId).startsWith('group_')) ? selectedClientId : '';
   const list = filterAccId ? accountsData.filter(a=>a.id===filterAccId) : accountsData;
   const dateLabel = document.getElementById('datePreset').value === 'custom'
     ? (document.getElementById('dateFrom1').value + ' → ' + document.getElementById('dateTo1').value)
