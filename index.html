@@ -172,8 +172,8 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .top-ads-controls{display:flex;align-items:center;gap:8px}
 .top-ads-list{display:flex;flex-direction:column;gap:10px}
 .ad-card-h{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;align-items:stretch;gap:12px;padding:10px}
-.ad-thumb-box{flex:0 0 140px;width:140px;height:140px;border-radius:var(--radius);overflow:hidden;background:var(--bg3);position:relative}
-.ad-thumb{width:100%;height:100%;object-fit:cover;background:var(--bg3);display:block}
+.ad-thumb-box{flex:0 0 140px;width:140px;border-radius:var(--radius);overflow:hidden;background:var(--bg3);position:relative;align-self:stretch;min-height:140px}
+.ad-thumb{width:100%;height:100%;object-fit:cover;background:var(--bg3);display:block;position:absolute;inset:0}
 .ad-thumb-placeholder{width:100%;height:100%;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px}
 .ad-metrics-box{flex:0 0 200px;width:200px;background:var(--bg2);border-radius:var(--radius);padding:8px;display:flex;flex-direction:column;gap:4px}
 .ad-metrics-h-title{font-size:12px;font-weight:700;color:var(--text);padding:2px 4px 6px;border-bottom:0.5px solid var(--border);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -185,7 +185,7 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .ad-chart-legend{display:flex;gap:10px;align-items:center;font-size:10px;margin-bottom:2px}
 .ad-chart-legend-item{display:flex;align-items:center;gap:4px;color:var(--text2)}
 .ad-chart-legend-dot{width:8px;height:8px;border-radius:50%}
-.ad-chart-svg{width:100%;height:110px;display:block}
+.ad-chart-svg{display:block;max-width:100%;height:auto}
 .ad-chart-empty{display:flex;align-items:center;justify-content:center;height:110px;color:var(--text3);font-size:11px}
 .ad-preview-box{flex:0 0 70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;color:var(--text2);font-size:11px;border-left:0.5px solid var(--border);padding:0 4px}
 .ad-preview-box:hover{color:var(--blue)}
@@ -1699,7 +1699,7 @@ function renderDetail() {
       </div>`:''}
       <div class="top-ads-section" id="top-ads-section-${acc.id}">
         <div class="top-ads-header">
-          <span class="top-ads-title">🏆 Anuncios ganadores</span>
+          <span class="top-ads-title">Anuncios ganadores</span>
           <div class="top-ads-controls">
             <label style="font-size:12px;color:var(--text2)">Ordenar por</label>
             <select id="top-ads-sort-${acc.id}" style="padding:4px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text)" onchange="loadTopAds('${acc.id}')">
@@ -1823,7 +1823,9 @@ async function loadTopAds(accountId) {
           '</div>' +
         '</div>';
 
-      const chartBox = '<div class="ad-chart-box">' + buildAdChartSvg(ad.dailySeries, sym) + '</div>';
+      // Chart se rellena DESPUÉS de insertar el HTML (necesitamos medir el ancho real
+      // del container para no estirar el SVG). Por ahora dejamos un slot vacío.
+      const chartBox = '<div class="ad-chart-box" data-chart-ad="' + ad.id + '"></div>';
 
       const previewBox = ad.previewUrl
         ? '<a class="ad-preview-box" href="' + ad.previewUrl + '" target="_blank" rel="noopener" title="Ver anuncio en Meta">' +
@@ -1839,6 +1841,28 @@ async function loadTopAds(accountId) {
     }).join('');
 
     container.innerHTML = '<div class="top-ads-list">' + cards + '</div>';
+
+    // Ahora que el DOM existe, medimos cada chart-box y renderizamos el SVG
+    // al ancho real. Incluimos fallback por si offsetWidth es 0 (panel oculto).
+    const fillCharts = () => {
+      container.querySelectorAll('.ad-chart-box[data-chart-ad]').forEach(box => {
+        const adId = box.getAttribute('data-chart-ad');
+        const ad = ads.find(a => a.id === adId);
+        if (!ad) return;
+        // offsetWidth incluye padding, restamos para quedarnos con el área útil
+        const style = window.getComputedStyle(box);
+        const padL = parseFloat(style.paddingLeft) || 0;
+        const padR = parseFloat(style.paddingRight) || 0;
+        const avail = Math.floor((box.clientWidth || box.offsetWidth) - padL - padR);
+        const w = avail > 40 ? avail : 340;
+        box.innerHTML = buildAdChartSvg(ad.dailySeries, sym, w);
+      });
+    };
+    fillCharts();
+    // Re-render si la ventana cambia de tamaño (por si el usuario redimensiona)
+    window.addEventListener('resize', () => {
+      if (document.body.contains(container)) fillCharts();
+    }, { once: true });
 
   } catch(e) {
     console.error('[TopAds]', e);
@@ -2148,14 +2172,14 @@ function fetchDailySeries(accountId, dp, adIds) {
   });
 }
 
-// Construye el SVG del mini-gráfico. 3 series normalizadas independientemente
-// (Compras, Facturación, ROAS) para que convivan en el mismo plot area.
-// El max de cada serie se muestra en la leyenda.
-function buildAdChartSvg(series, sym) {
+// Construye el SVG del mini-gráfico. Estilo minimalista: curvas suaves,
+// sin gridlines, endpoints marcados, labels de fecha discretos.
+// Recibe el ancho del container en px para NO estirar el SVG.
+function buildAdChartSvg(series, sym, containerW) {
   if (!series || series.length < 2) {
     return '<div class="ad-chart-empty">Sin datos suficientes para graficar</div>';
   }
-  const W = 340, H = 110, PL = 8, PR = 8, PT = 6, PB = 22;
+  const W = Math.max(240, containerW || 340), H = 110, PL = 12, PR = 12, PT = 8, PB = 22;
   const plotW = W - PL - PR, plotH = H - PT - PB;
   const n = series.length;
   const xFor = i => PL + (n === 1 ? plotW/2 : (i/(n-1))*plotW);
@@ -2168,39 +2192,56 @@ function buildAdChartSvg(series, sym) {
   const yRev   = v => PT + plotH - (v / maxRev)   * plotH;
   const yRoas  = v => PT + plotH - (v / maxRoas)  * plotH;
 
-  const linePath = (yFn) => series.map((d,i) => {
-    const x = xFor(i), y = yFn(d[d._k || 0]);
-    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
-  }).join(' ');
+  // Smooth Catmull-Rom → Bézier cubic para curvas sin picos duros.
+  function smoothPath(points) {
+    if (points.length < 2) return '';
+    if (points.length === 2) return `M${points[0][0]},${points[0][1]} L${points[1][0]},${points[1][1]}`;
+    let d = `M${points[0][0]},${points[0][1]}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i - 1] || points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2] || p2;
+      const t = 0.18; // tensión: menor = más suave
+      const c1x = p1[0] + (p2[0] - p0[0]) * t;
+      const c1y = p1[1] + (p2[1] - p0[1]) * t;
+      const c2x = p2[0] - (p3[0] - p1[0]) * t;
+      const c2y = p2[1] - (p3[1] - p1[1]) * t;
+      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
+  }
 
-  // Paths manuales (no podemos usar d._k porque d no tiene esa prop)
-  const pathPurch = series.map((d,i) => { const x=xFor(i),y=yPurch(d.purchases);return (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);}).join(' ');
-  const pathRev   = series.map((d,i) => { const x=xFor(i),y=yRev(d.revenue);  return (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);}).join(' ');
-  const pathRoas  = series.map((d,i) => { const x=xFor(i),y=yRoas(d.roas);    return (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+  const pointsPurch = series.map((d,i) => [xFor(i), yPurch(d.purchases)]);
+  const pointsRev   = series.map((d,i) => [xFor(i), yRev(d.revenue)]);
+  const pointsRoas  = series.map((d,i) => [xFor(i), yRoas(d.roas)]);
 
-  // Gridlines horizontales (3)
-  const gridLines = [0.25, 0.5, 0.75].map(f => {
-    const y = PT + plotH * f;
-    return `<line x1="${PL}" x2="${PL+plotW}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,3"/>`;
-  }).join('');
+  const pathPurch = smoothPath(pointsPurch);
+  const pathRev   = smoothPath(pointsRev);
+  const pathRoas  = smoothPath(pointsRoas);
 
-  // Labels X (fechas): mostramos primera, medio, última si hay pocos puntos, sino 4
-  const labelIdxs = n <= 4
-    ? series.map((_,i) => i)
-    : [0, Math.floor(n/3), Math.floor(2*n/3), n-1];
+  // Labels X (fechas): solo primera y última para mantener limpio
   const dayLabel = (d) => {
     const parts = d.split('-'); // YYYY-MM-DD
     return parts[2] + '/' + parts[1];
   };
-  const xLabels = labelIdxs.map(i => {
-    const x = xFor(i);
-    return `<text x="${x.toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--text3)">${dayLabel(series[i].date)}</text>`;
-  }).join('');
+  let xLabels = '';
+  if (n >= 2) {
+    xLabels += `<text x="${xFor(0).toFixed(1)}" y="${H-6}" text-anchor="start" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[0].date)}</text>`;
+    xLabels += `<text x="${xFor(n-1).toFixed(1)}" y="${H-6}" text-anchor="end" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[n-1].date)}</text>`;
+    // Punto medio si hay espacio (≥4 puntos y ancho suficiente)
+    if (n >= 4 && W > 320) {
+      const mid = Math.floor(n/2);
+      xLabels += `<text x="${xFor(mid).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[mid].date)}</text>`;
+    }
+  }
 
-  // Puntos (dots) en cada vértice
-  const dotsPurch = series.map((d,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yPurch(d.purchases).toFixed(1)}" r="1.8" fill="#3b82f6"/>`).join('');
-  const dotsRev   = series.map((d,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yRev(d.revenue).toFixed(1)}" r="1.8" fill="#22c55e"/>`).join('');
-  const dotsRoas  = series.map((d,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yRoas(d.roas).toFixed(1)}" r="1.8" fill="#f59e0b"/>`).join('');
+  // Endpoints: dot solo en el último punto de cada serie (estilo minimal)
+  const endDot = (pts, color) => {
+    if (!pts.length) return '';
+    const [x,y] = pts[pts.length - 1];
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.8" fill="${color}"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${color}" opacity=".18"/>`;
+  };
 
   return `
     <div class="ad-chart-legend">
@@ -2208,12 +2249,13 @@ function buildAdChartSvg(series, sym) {
       <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#22c55e"></span>Facturación <b style="color:var(--text)">(max ${sym}${fmtN(Math.round(maxRev))})</b></span>
       <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#f59e0b"></span>ROAS <b style="color:var(--text)">(max ×${fmtDec(maxRoas)})</b></span>
     </div>
-    <svg class="ad-chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      ${gridLines}
-      <path d="${pathPurch}" fill="none" stroke="#3b82f6" stroke-width="1.6" stroke-linejoin="round"/>
-      <path d="${pathRev}"   fill="none" stroke="#22c55e" stroke-width="1.6" stroke-linejoin="round"/>
-      <path d="${pathRoas}"  fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-linejoin="round"/>
-      ${dotsPurch}${dotsRev}${dotsRoas}
+    <svg class="ad-chart-svg" width="${W}" height="${H}">
+      <path d="${pathPurch}" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${pathRev}"   fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${pathRoas}"  fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${endDot(pointsPurch, '#3b82f6')}
+      ${endDot(pointsRev,   '#22c55e')}
+      ${endDot(pointsRoas,  '#f59e0b')}
       ${xLabels}
     </svg>
   `;
