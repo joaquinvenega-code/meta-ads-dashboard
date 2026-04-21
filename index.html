@@ -182,9 +182,10 @@ textarea.obs{width:100%;border:0.5px solid var(--border2);border-radius:var(--ra
 .ad-metric-h .ml{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:1px}
 .ad-metric-h .mv{font-size:12px;font-weight:700;color:var(--text)}
 .ad-chart-box{flex:1 1 auto;min-width:260px;background:var(--bg2);border-radius:var(--radius);padding:8px 10px 4px;position:relative;overflow:hidden}
-.ad-chart-legend{display:flex;gap:10px;align-items:center;font-size:10px;margin-bottom:2px}
+.ad-chart-legend{display:flex;gap:12px;align-items:center;font-size:10px;margin-bottom:2px;flex-wrap:wrap}
 .ad-chart-legend-item{display:flex;align-items:center;gap:4px;color:var(--text2)}
 .ad-chart-legend-dot{width:8px;height:8px;border-radius:50%}
+.ad-chart-legend-max{color:var(--text);font-weight:600;margin-left:2px;letter-spacing:0.1px}
 .ad-chart-svg{display:block;max-width:100%;height:auto}
 .ad-chart-empty{display:flex;align-items:center;justify-content:center;height:110px;color:var(--text3);font-size:11px}
 .ad-preview-box{flex:0 0 70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;color:var(--text2);font-size:11px;border-left:0.5px solid var(--border);padding:0 4px}
@@ -672,10 +673,12 @@ let groupSettings = JSON.parse(localStorage.getItem('cr_gsettings') || '{}');
 let colOrder      = JSON.parse(localStorage.getItem('cr_colorder')  || 'null');
 
 // Column definitions
+// NOTA: ya no hay columnas "always:true". La vista por defecto es minimalista
+// (solo nombre + semáforo). Las métricas se agregan vía el dropdown.
 const BASE_COLS = [
-  { key:'spend',           label:'Invertido',           always:true  },
-  { key:'revenue',         label:'Facturado',            always:true  },
-  { key:'roas',            label:'ROAS',                 always:true  },
+  { key:'spend',           label:'Invertido'             },
+  { key:'revenue',         label:'Facturado'             },
+  { key:'roas',            label:'ROAS'                  },
   { key:'objetivo',        label:'Objetivo'              },
   { key:'objPct',          label:'% Objetivo'            },
   { key:'budgetPct',       label:'% Presupuesto'         },
@@ -688,9 +691,9 @@ const BASE_COLS = [
   { key:'messagesReal',        label:'Mensajes',             type:'messaging' },
   { key:'costPerMessageReal',  label:'Costo/msg',            type:'messaging' },
 ];
-let visibleColKeys = new Set(JSON.parse(localStorage.getItem('cr_viscols') || 'null') ||
-  ['objetivo','spend','revenue','roas','objPct','budgetPct','ctr','clicks',
-   'purchases','addToCart','checkouts','costPerPurchase','messagesReal','costPerMessageReal']);
+// cr_viscols_v2 (bump de key) para forzar default minimalista — los usuarios previos
+// con cr_viscols seguirán viendo todo hasta que cambien manualmente o resetean.
+let visibleColKeys = new Set(JSON.parse(localStorage.getItem('cr_viscols_v2') || 'null') || []);
 let colOrderArr = (colOrder && BASE_COLS.every(c => colOrder.includes(c.key)))
   ? colOrder : BASE_COLS.map(c=>c.key);
 
@@ -1486,22 +1489,21 @@ function buildColCfg() {
   const wrap = document.getElementById('colCfg');
   if (!wrap) return;
   const ordered = colOrderArr.map(k=>BASE_COLS.find(c=>c.key===k)).filter(Boolean);
-  const visibleCount = ordered.filter(c => c.always || visibleColKeys.has(c.key)).length;
+  const visibleCount = ordered.filter(c => visibleColKeys.has(c.key)).length;
   const total = ordered.length;
   const isOpen = wrap.dataset.open === '1';
 
   const chips = ordered.map(c => {
-    const checked = c.always || visibleColKeys.has(c.key);
-    const fixedStyle = c.always ? 'opacity:.5;pointer-events:none' : '';
+    const checked = visibleColKeys.has(c.key);
     return `<div class="ctog-drag" draggable="true"
                  data-key="${c.key}" data-table="det"
                  ondragstart="onTagDragStart(event)"
                  ondragover="onTagDragOver(event)"
                  ondrop="onTagDrop(event,'det')"
                  ondragend="onTagDragEnd(event)"
-                 style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:0.5px solid var(--border);border-radius:20px;background:${checked?'var(--blue-bg)':'var(--bg2)'};color:${checked?'var(--blue)':'var(--text2)'};font-size:12px;cursor:grab;user-select:none;${fixedStyle}">
+                 style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:0.5px solid var(--border);border-radius:20px;background:${checked?'var(--blue-bg)':'var(--bg2)'};color:${checked?'var(--blue)':'var(--text2)'};font-size:12px;cursor:grab;user-select:none">
              <span style="font-size:10px;opacity:.4;cursor:grab">⠿</span>
-             <input type="checkbox" ${checked?'checked':''} ${c.always?'disabled':''}
+             <input type="checkbox" ${checked?'checked':''}
                     onchange="toggleCol('${c.key}',this.checked)"
                     style="accent-color:var(--blue);margin:0;cursor:pointer">
              ${c.label}${c.type?` <span style="font-size:10px;opacity:.5">(${c.type})</span>`:''}
@@ -1518,7 +1520,10 @@ function buildColCfg() {
      <div class="col-cfg-panel ${isOpen?'open':''}" onclick="event.stopPropagation()">
        <div class="col-cfg-panel-header">
          <span class="col-cfg-panel-title">Tildá las métricas visibles · Arrastrá para reordenar</span>
-         <button type="button" class="col-cfg-reset" onclick="resetColCfg()">Resetear</button>
+         <div style="display:flex;gap:6px">
+           <button type="button" class="col-cfg-reset" onclick="resetColCfg()">Vaciar</button>
+           <button type="button" class="col-cfg-reset" onclick="showAllCols()">Mostrar todas</button>
+         </div>
        </div>
        ${chips}
      </div>`;
@@ -1533,9 +1538,15 @@ function toggleColCfgOpen(e) {
 }
 
 function resetColCfg() {
-  // Restaura todas las columnas visibles (excepto las always:true que ya están)
-  BASE_COLS.forEach(c => { if (!c.always) visibleColKeys.add(c.key); });
-  localStorage.setItem('cr_viscols', JSON.stringify([...visibleColKeys]));
+  // Vuelve al default minimalista: sin métricas visibles en la tabla.
+  visibleColKeys = new Set();
+  localStorage.setItem('cr_viscols_v2', JSON.stringify([...visibleColKeys]));
+  buildColCfg();
+  if (detailLoaded) renderDetail();
+}
+function showAllCols() {
+  BASE_COLS.forEach(c => visibleColKeys.add(c.key));
+  localStorage.setItem('cr_viscols_v2', JSON.stringify([...visibleColKeys]));
   buildColCfg();
   if (detailLoaded) renderDetail();
 }
@@ -1551,7 +1562,7 @@ document.addEventListener('click', (e) => {
 });
 function toggleCol(key,val) {
   val ? visibleColKeys.add(key) : visibleColKeys.delete(key);
-  localStorage.setItem('cr_viscols', JSON.stringify([...visibleColKeys]));
+  localStorage.setItem('cr_viscols_v2', JSON.stringify([...visibleColKeys]));
   // Rebuild el panel para actualizar contador y estilo del chip
   const wrap = document.getElementById('colCfg');
   if (wrap) wrap.dataset.open = '1'; // mantener abierto
@@ -1563,7 +1574,7 @@ function getActiveCols() {
   // respect colOrderArr, filter by visible
   return colOrderArr
     .map(k => BASE_COLS.find(c=>c.key===k))
-    .filter(c => c && (c.always || visibleColKeys.has(c.key)));
+    .filter(c => c && visibleColKeys.has(c.key));
 }
 
 function renderDetail() {
@@ -2179,7 +2190,7 @@ function buildAdChartSvg(series, sym, containerW) {
   if (!series || series.length < 2) {
     return '<div class="ad-chart-empty">Sin datos suficientes para graficar</div>';
   }
-  const W = Math.max(240, containerW || 340), H = 130, PL = 16, PR = 16, PT = 14, PB = 28;
+  const W = Math.max(240, containerW || 340), H = 120, PL = 12, PR = 12, PT = 10, PB = 24;
   const plotW = W - PL - PR, plotH = H - PT - PB;
   const n = series.length;
   const xFor = i => PL + (n === 1 ? plotW/2 : (i/(n-1))*plotW);
@@ -2249,31 +2260,17 @@ function buildAdChartSvg(series, sym, containerW) {
     xLabels += `<text x="${x.toFixed(1)}" y="${(H-8).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text3)" font-family="inherit">${dayLabel(series[n-1].date)}</text>`;
   }
 
-  // Peak markers: valor máx de cada serie en su posición X de pico
-  function peakLabel(vals, color, formatFn, avoidYs) {
-    let idx = 0, maxV = vals[0];
-    for (let i = 1; i < vals.length; i++) if (vals[i] > maxV) { maxV = vals[i]; idx = i; }
-    if (maxV <= 0) return { svg: '', y: -9999 };
-    const x = xFor(idx);
-    let y = PT + plotH - (maxV / Math.max(...vals)) * plotH - 4;
-    // Evitar colisión con labels previos (≥10px de separación)
-    while (avoidYs.some(ay => Math.abs(ay - y) < 10)) y -= 10;
-    if (y < 2) y = 2;
-    const txtAnchor = (idx === 0) ? 'start' : ((idx === n-1) ? 'end' : 'middle');
-    const label = formatFn(maxV);
-    const svg = `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${txtAnchor}" font-size="9" font-weight="700" fill="${color}" font-family="inherit">${label}</text>`;
-    return { svg, y };
-  }
-  const avoidYs = [];
-  const pkP = peakLabel(series.map(d => d.purchases), '#3b82f6', v => fmtN(v), avoidYs); avoidYs.push(pkP.y);
-  const pkR = peakLabel(series.map(d => d.revenue),   '#22c55e', v => sym + fmtN(Math.round(v)), avoidYs); avoidYs.push(pkR.y);
-  const pkX = peakLabel(series.map(d => d.roas),      '#f59e0b', v => '×' + fmtDec(v), avoidYs); avoidYs.push(pkX.y);
+  // Peak values van en la leyenda (no sobre el gráfico) para evitar colisiones
+  // y mantener la estética minimalista.
+  const maxPurchLbl = fmtN(maxPurch);
+  const maxRevLbl   = sym + fmtN(Math.round(maxRev));
+  const maxRoasLbl  = '×' + fmtDec(maxRoas);
 
   return `
     <div class="ad-chart-legend">
-      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#3b82f6"></span>Compras</span>
-      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#22c55e"></span>Facturación</span>
-      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#f59e0b"></span>ROAS</span>
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#3b82f6"></span>Compras <span class="ad-chart-legend-max">máx ${maxPurchLbl}</span></span>
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#22c55e"></span>Facturación <span class="ad-chart-legend-max">máx ${maxRevLbl}</span></span>
+      <span class="ad-chart-legend-item"><span class="ad-chart-legend-dot" style="background:#f59e0b"></span>ROAS <span class="ad-chart-legend-max">máx ${maxRoasLbl}</span></span>
     </div>
     <svg class="ad-chart-svg" width="${W}" height="${H}">
       <defs>
@@ -2297,7 +2294,6 @@ function buildAdChartSvg(series, sym, containerW) {
       <path d="${smoothPath(pointsPurch)}" fill="none" stroke="#3b82f6" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
       <path d="${smoothPath(pointsRev)}"   fill="none" stroke="#22c55e" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
       <path d="${smoothPath(pointsRoas)}"  fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
-      ${pkP.svg}${pkR.svg}${pkX.svg}
       ${xLabels}
     </svg>
   `;
